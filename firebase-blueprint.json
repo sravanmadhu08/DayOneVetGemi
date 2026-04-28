@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "User": {
+      "title": "User Profile",
+      "description": "User account and progress data",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isAdmin": { "type": "boolean" },
+        "bio": { "type": "string" },
+        "specialty": { "type": "string" },
+        "institution": { "type": "string" },
+        "quizStats": {
+          "type": "object",
+          "properties": {
+            "completed": { "type": "integer" },
+            "averageScore": { "type": "number" },
+            "lastScore": { "type": "number" },
+            "totalQuestions": { "type": "integer" },
+            "correctAnswers": { "type": "integer" }
+          }
+        },
+        "progress": {
+          "type": "object",
+          "description": "Progress in modules and quizzes"
+        }
+      },
+      "required": ["uid", "email", "createdAt"]
+    },
+    "Flashcard": {
+      "title": "Flashcard",
+      "description": "Study card with front and back content",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "ID of the creator (null for system cards)" },
+        "front": { "type": "string" },
+        "back": { "type": "string" },
+        "deck": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["front", "back"]
+    },
+    "FlashcardProgress": {
+      "title": "Flashcard Progress",
+      "description": "User's SRS progress for a specific flashcard",
+      "type": "object",
+      "properties": {
+        "cardId": { "type": "string" },
+        "interval": { "type": "number" },
+        "ease": { "type": "number" },
+        "nextReview": { "type": "number", "description": "Timestamp" },
+        "lastReviewed": { "type": "number", "description": "Timestamp" },
+        "consecutiveCorrect": { "type": "integer" }
+      },
+      "required": ["cardId", "nextReview"]
+    },
+    "StudyModule": {
+      "title": "Study Module",
+      "description": "Educational content module",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "category": { "type": "string" },
+        "content": { "type": "string", "description": "Markdown content" },
+        "order": { "type": "integer" }
+      },
+      "required": ["title", "content"]
+    },
+    "Quiz": {
+      "title": "Quiz",
+      "description": "Knowledge assessment",
+      "type": "object",
+      "properties": {
+        "moduleId": { "type": "string" },
+        "title": { "type": "string" },
+        "questions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "question": { "type": "string" },
+              "options": { "type": "array", "items": { "type": "string" } },
+              "correctAnswer": { "type": "integer" },
+              "explanation": { "type": "string" }
+            }
+          }
+        }
+      },
+      "required": ["title", "questions"]
+    },
+    "QuizHistory": {
+      "title": "Quiz Result",
+      "description": "Historical quiz performance data",
+      "type": "object",
+      "properties": {
+        "score": { "type": "number" },
+        "total": { "type": "integer" },
+        "correct": { "type": "integer" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "system": { "type": "string" },
+        "species": { "type": "string" }
+      },
+      "required": ["score", "total", "correct", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/users/{userId}/flashcardProgress/{cardId}": {
+      "schema": "FlashcardProgress",
+      "description": "User's SRS progress for cards"
+    },
+    "/users/{userId}/quizHistory/{historyId}": {
+      "schema": "QuizHistory",
+      "description": "Historical quiz results for analytics"
+    },
+    "/flashcards/{cardId}": {
+      "schema": "Flashcard",
+      "description": "Flashcards repository"
+    },
+    "/modules/{moduleId}": {
+      "schema": "StudyModule",
+      "description": "Study modules"
+    },
+    "/quizzes/{quizId}": {
+      "schema": "Quiz",
+      "description": "Quizzes for modules or cases"
+    }
+  }
+}

@@ -3,13 +3,14 @@ import {
   onAuthStateChanged, 
   User
 } from 'firebase/auth';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
 import { auth, db, handleFirestoreError, OperationType, googleProvider, signInWithPopup, signOut } from '@/src/lib/firebase';
-import { UserProfile } from '@/src/types';
+import { UserProfile, GlobalSettings } from '@/src/types';
 
 interface AuthContextType {
   user: User | null;
   profile: UserProfile | null;
+  globalSettings: GlobalSettings | null;
   loading: boolean;
   signIn: () => Promise<void>;
   logout: () => Promise<void>;
@@ -18,6 +19,8 @@ interface AuthContextType {
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
   promoteToAdmin: () => Promise<void>;
   promoteOtherToAdmin: (targetUid: string) => Promise<void>;
+  updateGlobalSettings: (settings: Partial<GlobalSettings>) => Promise<void>;
+  subscribe: (plan: string, months: number) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -25,9 +28,21 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
+  const [globalSettings, setGlobalSettings] = useState<GlobalSettings | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    // Listen to global settings
+    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
+      if (docSnap.exists()) {
+        setGlobalSettings(docSnap.data() as GlobalSettings);
+      } else {
+        setGlobalSettings({ isFreeMode: true }); // Default to true if not set
+      }
+    }, (error) => {
+       console.error("Error fetching global settings", error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       setUser(user);
       if (user) {
@@ -59,7 +74,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+      unsubSettings();
+    };
   }, []);
 
   const signIn = async () => {
@@ -145,6 +163,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const updateGlobalSettings = async (settings: Partial<GlobalSettings>) => {
+    if (!user || !profile?.isAdmin) return;
+    try {
+      await setDoc(doc(db, 'settings', 'global'), settings, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'settings/global');
+    }
+  };
+
+  const subscribe = async (plan: string, months: number) => {
+    if (!user || !profile) return;
+    try {
+      const now = Date.now();
+      const currentEnd = profile.subscriptionUntil || now;
+      const start = currentEnd > now ? currentEnd : now;
+      const newEnd = start + months * 30 * 24 * 60 * 60 * 1000;
+      
+      const payload = {
+        subscriptionPlan: plan,
+        subscriptionUntil: newEnd
+      };
+
+      await setDoc(doc(db, 'users', user.uid), payload, { merge: true });
+      setProfile({ ...profile, ...payload });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+    }
+  };
+
   const promoteToAdmin = async () => {
     if (!user) return;
     try {
@@ -173,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, logout, updateProgress, updateQuizStats, updateProfile, promoteToAdmin, promoteOtherToAdmin }}>
+    <AuthContext.Provider value={{ user, profile, globalSettings, loading, signIn, logout, updateProgress, updateQuizStats, updateProfile, promoteToAdmin, promoteOtherToAdmin, updateGlobalSettings, subscribe }}>
       {children}
     </AuthContext.Provider>
   );

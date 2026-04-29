@@ -97,6 +97,16 @@ export default function Dashboard() {
     }
   };
 
+  const getProseSizeClass = (text?: string) => {
+    if (!text) return 'prose-base leading-relaxed';
+    const len = text.length;
+    if (len < 60) return 'prose-2xl text-center font-medium leading-relaxed';
+    if (len < 120) return 'prose-xl text-center font-medium leading-relaxed';
+    if (len < 250) return 'prose-lg leading-relaxed';
+    if (len < 400) return 'prose-base leading-relaxed';
+    return 'prose-sm leading-relaxed';
+  };
+
   const completedModulesCount = Object.keys(profile?.progress || {}).length;
   const totalModules = MOCK_MODULES.length;
   const progressPercentage = (completedModulesCount / totalModules) * 100;
@@ -298,8 +308,8 @@ export default function Dashboard() {
                     >
                       <div className={`relative w-full h-[350px] transition-all duration-500 preserve-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
                         <div className="absolute inset-0 backface-hidden bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 border-2 border-indigo-500/20 rounded-2xl p-6 md:p-8 flex flex-col items-center justify-center text-center shadow-inner overflow-hidden">
-                          <div className="flex-1 w-full overflow-y-auto py-2 custom-scrollbar">
-                            <div className="prose prose-sm dark:prose-invert max-w-none text-indigo-950 dark:text-indigo-100 prose-img:rounded-xl prose-img:shadow-sm prose-img:mx-auto prose-img:max-h-[150px] object-contain flex flex-col items-center justify-center min-h-full">
+                          <div className="flex-1 w-full overflow-y-auto py-2 custom-scrollbar flex flex-col items-center justify-center">
+                            <div className={`prose dark:prose-invert max-w-none text-indigo-950 dark:text-indigo-100 prose-img:rounded-xl prose-img:shadow-sm prose-img:mx-auto prose-img:max-h-[150px] object-contain flex flex-col items-center justify-center min-h-full ${getProseSizeClass(reviewingCard.front)}`}>
                               <ReactMarkdown>{reviewingCard.front}</ReactMarkdown>
                             </div>
                           </div>
@@ -308,8 +318,8 @@ export default function Dashboard() {
                           </p>
                         </div>
                         <div className="absolute inset-0 backface-hidden rotate-y-180 bg-gradient-to-br from-emerald-500/10 via-teal-500/10 to-cyan-500/10 border-2 border-emerald-500/30 rounded-2xl p-6 md:p-8 flex flex-col items-center justify-center text-center shadow-lg overflow-hidden">
-                          <div className="flex-1 w-full overflow-y-auto py-2 custom-scrollbar">
-                            <div className="prose prose-sm dark:prose-invert max-w-none text-emerald-900 dark:text-emerald-100 prose-img:rounded-xl prose-img:shadow-sm prose-img:mx-auto prose-img:max-h-[150px] object-contain flex flex-col items-center justify-center min-h-full">
+                          <div className="flex-1 w-full overflow-y-auto py-2 custom-scrollbar flex flex-col items-center justify-center">
+                            <div className={`prose dark:prose-invert max-w-none text-emerald-900 dark:text-emerald-100 prose-img:rounded-xl prose-img:shadow-sm prose-img:mx-auto prose-img:max-h-[150px] object-contain flex flex-col items-center justify-center min-h-full ${getProseSizeClass(reviewingCard.back)}`}>
                               <ReactMarkdown>{reviewingCard.back}</ReactMarkdown>
                             </div>
                           </div>

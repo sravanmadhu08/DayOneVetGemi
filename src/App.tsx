@@ -9,7 +9,9 @@ import QuizList from '@/src/pages/QuizList';
 import QuizDetail from '@/src/pages/QuizDetail';
 import Landing from '@/src/pages/Landing';
 import Profile from '@/src/pages/Profile';
+import Subscribe from '@/src/pages/Subscribe';
 import ProgressTracker from '@/src/pages/ProgressTracker';
+import SubscriptionGuard from '@/src/components/SubscriptionGuard';
 import { Toaster } from '@/components/ui/sonner';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -37,20 +39,23 @@ export default function App() {
               path="/*"
               element={
                 <PrivateRoute>
-                  <div className="flex flex-col">
+                  <div className="flex flex-col min-h-screen">
                     <Navbar />
                     <main className="flex-1 container mx-auto py-6 px-4">
-                      <Routes>
-                        <Route path="/" element={<Dashboard />} />
-                        <Route path="/flashcards" element={<Flashcards />} />
-                        <Route path="/modules" element={<StudyModules />} />
-                        <Route path="/modules/:moduleId" element={<ModuleDetail />} />
-                        <Route path="/quizzes" element={<QuizList />} />
-                        <Route path="/quizzes/session" element={<QuizDetail />} />
-                        <Route path="/progress" element={<ProgressTracker />} />
-                        <Route path="/profile" element={<Profile />} />
-                        <Route path="*" element={<Navigate to="/" />} />
-                      </Routes>
+                      <SubscriptionGuard>
+                        <Routes>
+                          <Route path="/" element={<Dashboard />} />
+                          <Route path="/flashcards" element={<Flashcards />} />
+                          <Route path="/modules" element={<StudyModules />} />
+                          <Route path="/modules/:moduleId" element={<ModuleDetail />} />
+                          <Route path="/quizzes" element={<QuizList />} />
+                          <Route path="/quizzes/session" element={<QuizDetail />} />
+                          <Route path="/progress" element={<ProgressTracker />} />
+                          <Route path="/profile" element={<Profile />} />
+                          <Route path="/subscribe" element={<Subscribe />} />
+                          <Route path="*" element={<Navigate to="/" />} />
+                        </Routes>
+                      </SubscriptionGuard>
                     </main>
                   </div>
                 </PrivateRoute>

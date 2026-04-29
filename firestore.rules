@@ -37,7 +37,7 @@ service cloud.firestore {
       allow create: if isOwner(userId) && 
         request.resource.data.uid == request.auth.uid;
       allow update: if isOwner(userId) && 
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'progress', 'quizStats', 'bio', 'specialty', 'institution']);
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['displayName', 'photoURL', 'progress', 'quizStats', 'bio', 'specialty', 'institution', 'subscriptionPlan', 'subscriptionUntil']);
 
       // Sub-collections
       match /flashcardProgress/{cardId} {
@@ -101,7 +101,13 @@ service cloud.firestore {
       allow read: if isSignedIn();
       allow write: if isAdmin();
     }
-    
+
+    // Global Settings collection
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     // Admins collection (Read-only for rules)
     match /admins/{adminId} {
       allow read: if isSignedIn();

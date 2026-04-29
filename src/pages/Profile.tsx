@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { 
   LogOut, 
   Calendar, 
@@ -30,7 +31,7 @@ import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export default function Profile() {
-  const { profile, logout, updateProfile, promoteToAdmin, promoteOtherToAdmin, user } = useAuth();
+  const { profile, logout, updateProfile, promoteToAdmin, promoteOtherToAdmin, user, globalSettings, updateGlobalSettings } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     displayName: profile?.displayName || '',
@@ -226,6 +227,26 @@ export default function Profile() {
               </div>
             </div>
             
+            {!profile?.isAdmin && !globalSettings?.isFreeMode && (
+              <div className="pt-8 border-t">
+                <Card className="bg-primary/5 border-primary/20">
+                  <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <div>
+                      <h4 className="font-bold text-lg">Subscription Details</h4>
+                      {profile?.subscriptionUntil && profile.subscriptionUntil > Date.now() ? (
+                        <p className="text-sm text-muted-foreground">Active until {new Date(profile.subscriptionUntil).toLocaleDateString()} on the {profile.subscriptionPlan} plan.</p>
+                      ) : (
+                        <p className="text-sm text-destructive font-medium">Your subscription has expired or is missing.</p>
+                      )}
+                    </div>
+                    <Link to="/subscribe">
+                      <Button variant="default" className="whitespace-nowrap">Manage Subscription</Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+            
             <div className="pt-8 flex flex-col sm:flex-row gap-4 border-t">
               <Button variant="outline" onClick={logout} className="text-destructive hover:bg-destructive/10 hover:text-destructive rounded-xl">
                 <LogOut className="mr-2 h-4 w-4" /> Sign Out
@@ -245,11 +266,22 @@ export default function Profile() {
 
             {(profile?.isAdmin || user?.email === 'sravan96mufc@gmail.com') && (
               <div className="pt-8 border-t space-y-6">
-                 <div>
-                   <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 text-primary mb-1">
-                      <Settings className="h-5 w-5" /> Admin Control Panel
-                   </h4>
-                   <p className="text-sm text-muted-foreground">Manage platform content and databases.</p>
+                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                   <div>
+                     <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 text-primary mb-1">
+                        <Settings className="h-5 w-5" /> Admin Control Panel
+                     </h4>
+                     <p className="text-sm text-muted-foreground">Manage platform content and databases.</p>
+                   </div>
+                   
+                   <div className="flex items-center space-x-3 bg-muted/50 p-3 rounded-lg border">
+                     <Label htmlFor="free-mode" className="font-bold cursor-pointer">App Free Mode</Label>
+                     <Switch 
+                        id="free-mode" 
+                        checked={globalSettings?.isFreeMode ?? true} 
+                        onCheckedChange={(val) => updateGlobalSettings({ isFreeMode: val })}
+                     />
+                   </div>
                  </div>
                  
                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">

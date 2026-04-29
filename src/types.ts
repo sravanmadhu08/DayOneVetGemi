@@ -8,6 +8,8 @@ export interface UserProfile {
   bio?: string;
   specialty?: string;
   institution?: string;
+  subscriptionPlan?: string | null;
+  subscriptionUntil?: number | null;
   progress?: {
     [moduleId: string]: {
       score: number;
@@ -72,3 +74,8 @@ export interface QuizSession {
     duration?: number | null;
   };
 }
+
+export interface GlobalSettings {
+  isFreeMode: boolean;
+}
+

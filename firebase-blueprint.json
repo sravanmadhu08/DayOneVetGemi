@@ -14,6 +14,8 @@
         "bio": { "type": "string" },
         "specialty": { "type": "string" },
         "institution": { "type": "string" },
+        "subscriptionPlan": { "type": "string" },
+        "subscriptionUntil": { "type": "string", "format": "date-time" },
         "quizStats": {
           "type": "object",
           "properties": {
@@ -189,9 +191,22 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "summary"]
+    },
+    "GlobalSettings": {
+      "title": "Global System Settings",
+      "description": "Application-wide settings managed by admin",
+      "type": "object",
+      "properties": {
+        "isFreeMode": { "type": "boolean" }
+      },
+      "required": ["isFreeMode"]
     }
   },
   "firestore": {
+    "/settings/{settingId}": {
+      "schema": "GlobalSettings",
+      "description": "Global application configuration"
+    },
     "/users/{userId}": {
       "schema": "User",
       "description": "User profiles"

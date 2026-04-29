@@ -10,7 +10,6 @@ import QuizDetail from '@/src/pages/QuizDetail';
 import Landing from '@/src/pages/Landing';
 import Profile from '@/src/pages/Profile';
 import ProgressTracker from '@/src/pages/ProgressTracker';
-import BulkImportPage from '@/src/pages/BulkImportPage';
 import { Toaster } from '@/components/ui/sonner';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
@@ -49,7 +48,6 @@ export default function App() {
                         <Route path="/quizzes" element={<QuizList />} />
                         <Route path="/quizzes/session" element={<QuizDetail />} />
                         <Route path="/progress" element={<ProgressTracker />} />
-                        <Route path="/import" element={<BulkImportPage />} />
                         <Route path="/profile" element={<Profile />} />
                         <Route path="*" element={<Navigate to="/" />} />
                       </Routes>

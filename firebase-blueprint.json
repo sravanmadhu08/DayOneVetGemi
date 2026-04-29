@@ -67,7 +67,18 @@
         "title": { "type": "string" },
         "category": { "type": "string" },
         "content": { "type": "string", "description": "Markdown content" },
-        "order": { "type": "integer" }
+        "order": { "type": "integer" },
+        "sections": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "title": { "type": "string" },
+              "content": { "type": "string" }
+            },
+            "required": ["title", "content"]
+          }
+        }
       },
       "required": ["title", "content"]
     },
@@ -86,12 +97,32 @@
               "question": { "type": "string" },
               "options": { "type": "array", "items": { "type": "string" } },
               "correctAnswer": { "type": "integer" },
-              "explanation": { "type": "string" }
+              "explanation": { "type": "string" },
+              "sourceId": { "type": "string", "description": "Reference to a PdfDocument id" },
+              "species": { "type": "array", "items": { "type": "string" } },
+              "system": { "type": "string" }
             }
           }
         }
       },
       "required": ["title", "questions"]
+    },
+    "Question": {
+       "title": "Practice Question",
+       "description": "Individual practice question in the global pool",
+       "type": "object",
+       "properties": {
+         "userId": { "type": "string", "description": "Creator ID (null for system questions)" },
+         "question": { "type": "string" },
+         "options": { "type": "array", "items": { "type": "string" } },
+         "correctAnswer": { "type": "integer" },
+         "explanation": { "type": "string" },
+         "species": { "type": "array", "items": { "type": "string" } },
+         "system": { "type": "string" },
+         "sourceId": { "type": "string", "description": "Reference to a PdfDocument id" },
+         "createdAt": { "type": "string", "format": "date-time" }
+       },
+       "required": ["question", "options", "correctAnswer", "species", "system"]
     },
     "QuizHistory": {
       "title": "Quiz Result",
@@ -106,6 +137,58 @@
         "species": { "type": "string" }
       },
       "required": ["score", "total", "correct", "timestamp"]
+    },
+    "CompletedPracticeQuestion": {
+      "title": "Completed Practice Question",
+      "description": "A record of a practice question answered correctly",
+      "type": "object",
+      "properties": {
+        "questionId": { "type": "string" },
+        "completedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["questionId", "completedAt"]
+    },
+    "ModuleProgress": {
+      "title": "Module Progress",
+      "description": "User's progress through a specific study module",
+      "type": "object",
+      "properties": {
+        "moduleId": { "type": "string" },
+        "currentSection": { "type": "integer" },
+        "totalSections": { "type": "integer" },
+        "completed": { "type": "boolean" },
+        "completedAt": { "type": "string", "format": "date-time" },
+        "lastReadAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["moduleId", "currentSection", "totalSections"]
+    },
+    "PdfDocument": {
+      "title": "PDF Document",
+      "description": "Metadata for a study PDF",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "Uploader ID (null for system files)" },
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "size": { "type": "string" },
+        "url": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "url", "createdAt"]
+    },
+    "Guideline": {
+      "title": "Clinical Guideline",
+      "description": "Veterinary clinical guidelines",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "author": { "type": "string" },
+        "date": { "type": "string" },
+        "summary": { "type": "string" },
+        "url": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "summary"]
     }
   },
   "firestore": {
@@ -121,6 +204,14 @@
       "schema": "QuizHistory",
       "description": "Historical quiz results for analytics"
     },
+    "/users/{userId}/completedPracticeQuestions/{questionId}": {
+      "schema": "CompletedPracticeQuestion",
+      "description": "Correctly answered practice questions"
+    },
+    "/users/{userId}/moduleProgress/{moduleId}": {
+      "schema": "ModuleProgress",
+      "description": "Detailed progress tracking for individual modules"
+    },
     "/flashcards/{cardId}": {
       "schema": "Flashcard",
       "description": "Flashcards repository"
@@ -132,6 +223,18 @@
     "/quizzes/{quizId}": {
       "schema": "Quiz",
       "description": "Quizzes for modules or cases"
+    },
+    "/pdfs/{pdfId}": {
+      "schema": "PdfDocument",
+      "description": "Library of PDF study materials"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Practice questions library"
+    },
+    "/guidelines/{guidelineId}": {
+      "schema": "Guideline",
+      "description": "Clinical guidelines"
     }
   }
 }

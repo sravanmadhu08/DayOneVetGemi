@@ -48,6 +48,7 @@ export interface StudyModule {
   category: string;
   content: string; // Markdown
   order: number;
+  sections?: { title: string; content: string; }[];
 }
 
 export interface Question {
@@ -58,6 +59,7 @@ export interface Question {
   explanation: string;
   species: string[]; // e.g. ["Canine", "Feline"]
   system: string; // e.g. "Cardiology"
+  sourceId?: string; // Reference to a PdfDocument id
 }
 
 export interface QuizSession {

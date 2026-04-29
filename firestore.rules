@@ -49,6 +49,19 @@ service cloud.firestore {
         allow read: if isOwner(userId);
         allow create: if isOwner(userId) && isValidHistory(request.resource.data);
       }
+
+      match /completedPracticeQuestions/{questionId} {
+        allow read, list: if isOwner(userId);
+        allow create: if isOwner(userId) && 
+          request.resource.data.keys().hasAll(['questionId', 'completedAt']) &&
+          request.resource.data.questionId == questionId &&
+          (request.resource.data.completedAt == request.time || request.resource.data.completedAt is timestamp);
+      }
+
+      match /moduleProgress/{moduleId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId);
+      }
     }
 
     // Flashcard Rules (Global repository)
@@ -70,16 +83,32 @@ service cloud.firestore {
       allow write: if isAdmin();
     }
 
+    // PDF Library Rules - ADMIN ONLY
+    match /pdfs/{pdfId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if isAdmin();
+    }
+
     // Custom Questions Rules
     match /questions/{questionId} {
-      allow read: if isSignedIn() && (resource.data.userId == request.auth.uid || !resource.data.keys().contains('userId'));
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow update, delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && (request.resource.data.userId == request.auth.uid || isAdmin());
+      allow update, delete: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+
+    // Guidelines Rules
+    match /guidelines/{guidelineId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
     }
     
     // Admins collection (Read-only for rules)
     match /admins/{adminId} {
       allow read: if isSignedIn();
+      allow create, delete: if isSignedIn() && (
+        request.auth.token.email == 'sravan96mufc@gmail.com' ||
+        (!exists(/databases/$(database)/documents/admins) && adminId == request.auth.uid)
+      );
     }
   }
 }

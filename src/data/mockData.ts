@@ -186,3 +186,55 @@ export const MOCK_MODULES: StudyModule[] = [
     order: 6
   }
 ];
+
+export const MOCK_PDFS = [
+  { id: 'pdf-1', title: 'NAVLE Study Guide 2024', author: 'VetBoard', size: '2.4 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
+  { id: 'pdf-2', title: 'AAHA Canine Vaccination Guidelines', author: 'AAHA', size: '1.1 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
+  { id: 'pdf-3', title: 'Global Feline Health Report', author: 'ISFM', size: '3.8 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
+  { id: 'pdf-4', title: 'Equine Anesthesia Protocol', author: 'BEVA', size: '1.5 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
+];
+
+export const MOCK_GUIDELINES = [
+  { 
+    id: 'guide-1', 
+    title: 'Clinical Practice Ethics', 
+    content: 'Standard operating procedures for ethical veterinary practice including client communication and patient welfare...',
+    category: 'Ethics'
+  },
+  { 
+    id: 'guide-2', 
+    title: 'Surgical Gowns & Draping', 
+    content: 'Comprehensive guide on maintaining sterility in the operating theater through proper draping techniques...',
+    category: 'Surgery'
+  },
+  { 
+    id: 'guide-3', 
+    title: 'Biosecurity Fundamentals', 
+    content: 'Key principles for preventing the spread of infectious disease within a clinical setting...',
+    category: 'Safety'
+  },
+];
+
+export const MOCK_RESOURCES = [
+  { 
+    id: 'res-1', 
+    title: 'VIN - Veterinary Information Network', 
+    description: 'The largest online veterinary community for clinicians.',
+    url: 'https://www.vin.com',
+    type: 'Community'
+  },
+  { 
+    id: 'res-2', 
+    title: 'Merck Veterinary Manual', 
+    description: 'Comprehensive reference for veterinary professionals.',
+    url: 'https://www.merckvetmanual.com',
+    type: 'Reference'
+  },
+  { 
+    id: 'res-3', 
+    title: 'AVMA Resources', 
+    description: 'American Veterinary Medical Association official resources.',
+    url: 'https://www.avma.org',
+    type: 'Professional'
+  },
+];

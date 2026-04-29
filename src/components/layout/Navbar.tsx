@@ -97,10 +97,12 @@ export default function Navbar() {
                 </DropdownMenuGroup>
                 <DropdownMenuSeparator />
                 <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => navigate('/import')}>
-                    <Upload className="mr-2 h-4 w-4" />
-                    <span>Import Questions</span>
-                  </DropdownMenuItem>
+                  {user?.email === 'sravan96mufc@gmail.com' && (
+                    <DropdownMenuItem onClick={() => navigate('/import')}>
+                      <Upload className="mr-2 h-4 w-4" />
+                      <span>Import Questions</span>
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={() => navigate('/profile')}>
                     <UserIcon className="mr-2 h-4 w-4" />
                     <span>Profile</span>

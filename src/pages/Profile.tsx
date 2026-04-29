@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '@/src/hooks/useAuth';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -11,6 +11,7 @@ import {
   Calendar, 
   Mail, 
   Shield, 
+  ShieldCheck,
   Edit2, 
   Save, 
   X, 
@@ -20,13 +21,16 @@ import {
   Trophy,
   Target,
   Flame,
-  TrendingUp
+  TrendingUp,
+  Settings,
+  BookOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Link } from 'react-router-dom';
 import { toast } from 'sonner';
 
 export default function Profile() {
-  const { profile, logout, updateProfile } = useAuth();
+  const { profile, logout, updateProfile, promoteToAdmin, promoteOtherToAdmin, user } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     displayName: profile?.displayName || '',
@@ -35,6 +39,11 @@ export default function Profile() {
     institution: profile?.institution || ''
   });
   const [isSaving, setIsSaving] = useState(false);
+  const [isPromoting, setIsPromoting] = useState(false);
+  
+  // Super admin state
+  const [targetUid, setTargetUid] = useState('');
+  const [isPromotingOther, setIsPromotingOther] = useState(false);
 
   const handleSave = async () => {
     setIsSaving(true);
@@ -46,6 +55,32 @@ export default function Profile() {
       toast.error('Failed to update profile');
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handlePromote = async () => {
+    setIsPromoting(true);
+    try {
+      await promoteToAdmin();
+      toast.success('You are now an administrator!');
+    } catch (error) {
+      toast.error('Promotion failed. Check console for details.');
+    } finally {
+      setIsPromoting(false);
+    }
+  };
+
+  const handlePromoteOther = async () => {
+    if(!targetUid) return;
+    setIsPromotingOther(true);
+    try {
+      await promoteOtherToAdmin(targetUid);
+      toast.success('User promoted to admin successfully!');
+      setTargetUid('');
+    } catch (error) {
+      toast.error('Failed to promote user.');
+    } finally {
+      setIsPromotingOther(false);
     }
   };
 
@@ -192,13 +227,123 @@ export default function Profile() {
             </div>
             
             <div className="pt-8 flex flex-col sm:flex-row gap-4 border-t">
-              <Button variant="outline" onClick={logout} className="text-destructive hover:bg-destructive/10 hover:text-destructive">
+              <Button variant="outline" onClick={logout} className="text-destructive hover:bg-destructive/10 hover:text-destructive rounded-xl">
                 <LogOut className="mr-2 h-4 w-4" /> Sign Out
               </Button>
-              <div className="text-xs text-muted-foreground flex items-center sm:ml-auto">
-                <Shield className="h-3 w-3 mr-1" /> Profile public visibility and security managed by Vetica.
+              
+              {(!profile?.isAdmin && user?.email === 'sravan96mufc@gmail.com') ? (
+                <Button variant="ghost" onClick={handlePromote} disabled={isPromoting} className="rounded-xl text-primary hover:bg-primary/5">
+                   <ShieldCheck className="h-4 w-4 mr-2" /> 
+                   {isPromoting ? 'Promoting...' : 'Promote Self to Admin'}
+                </Button>
+              ) : null}
+
+              <div className="text-xs text-muted-foreground flex items-center sm:ml-auto mt-4 sm:mt-0">
+                <Shield className="h-3 w-3 mr-1" /> Profile security managed by Vetica.
               </div>
             </div>
+
+            {(profile?.isAdmin || user?.email === 'sravan96mufc@gmail.com') && (
+              <div className="pt-8 border-t space-y-6">
+                 <div>
+                   <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 text-primary mb-1">
+                      <Settings className="h-5 w-5" /> Admin Control Panel
+                   </h4>
+                   <p className="text-sm text-muted-foreground">Manage platform content and databases.</p>
+                 </div>
+                 
+                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Questions</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Questions upload initiated')}>
+                          Bulk Upload CSV
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2"><Flame className="h-4 w-4 text-primary" /> Modules</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Module creator opened')}>
+                          Add Module
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2"><Briefcase className="h-4 w-4 text-primary" /> Flashcards</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Flashcard upload initiated')}>
+                          Add Flashcards
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2"><BookOpen className="h-4 w-4 text-primary" /> PDF Resources</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('PDF upload initiated')}>
+                          Upload PDFs
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2"><GraduationCap className="h-4 w-4 text-primary" /> Guidelines</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Guidelines editor opened')}>
+                          Add Guidelines
+                        </Button>
+                      </CardContent>
+                    </Card>
+
+                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm flex items-center gap-2"><LogOut className="h-4 w-4 text-primary" /> Databases</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Database connector opened')}>
+                          Other Databases
+                        </Button>
+                      </CardContent>
+                    </Card>
+                 </div>
+              </div>
+            )}
+
+            {user?.email === 'sravan96mufc@gmail.com' && (
+              <div className="pt-8 border-t space-y-4">
+                 <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 text-primary">
+                    <ShieldCheck className="h-4 w-4" /> Super Admin Center
+                 </h4>
+                 <div className="flex flex-col sm:flex-row gap-2">
+                    <Input 
+                      placeholder="Enter User UID to promote" 
+                      value={targetUid} 
+                      onChange={e => setTargetUid(e.target.value)} 
+                      className="rounded-xl flex-1 h-12 text-sm"
+                    />
+                    <Button 
+                      onClick={handlePromoteOther} 
+                      disabled={isPromotingOther || !targetUid} 
+                      className="rounded-xl h-12 px-8 font-black uppercase text-xs tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                    >
+                       Promote User
+                    </Button>
+                 </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </motion.div>

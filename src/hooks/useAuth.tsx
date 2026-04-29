@@ -16,6 +16,8 @@ interface AuthContextType {
   updateProgress: (moduleId: string, score: number) => Promise<void>;
   updateQuizStats: (score: number, totalQuestions: number, correctAnswers: number) => Promise<void>;
   updateProfile: (data: Partial<UserProfile>) => Promise<void>;
+  promoteToAdmin: () => Promise<void>;
+  promoteOtherToAdmin: (targetUid: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -43,7 +45,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             await setDoc(doc(db, 'users', user.uid), newProfile);
             setProfile(newProfile);
           } else {
-            setProfile(userDoc.data() as UserProfile);
+            const data = userDoc.data() as UserProfile;
+            // Check if user is an admin
+            const adminDoc = await getDoc(doc(db, 'admins', user.uid));
+            setProfile({ ...data, isAdmin: adminDoc.exists() });
           }
         } catch (error) {
           console.error("Error fetching user profile", error);
@@ -140,8 +145,35 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const promoteToAdmin = async () => {
+    if (!user) return;
+    try {
+      await setDoc(doc(db, 'admins', user.uid), {
+        email: user.email,
+        promotedAt: Date.now()
+      });
+      setProfile(prev => prev ? { ...prev, isAdmin: true } : null);
+    } catch (error) {
+      console.error("Failed to promote to admin. Ensure rules allow this for your account.");
+      throw error;
+    }
+  };
+
+  const promoteOtherToAdmin = async (targetUid: string) => {
+    if (!user || user.email !== 'sravan96mufc@gmail.com') return;
+    try {
+      await setDoc(doc(db, 'admins', targetUid), {
+        promotedAt: Date.now(),
+        promotedBy: user.email
+      });
+    } catch (error) {
+      console.error("Failed to promote other to admin.", error);
+      throw error;
+    }
+  };
+
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, logout, updateProgress, updateQuizStats, updateProfile }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, logout, updateProgress, updateQuizStats, updateProfile, promoteToAdmin, promoteOtherToAdmin }}>
       {children}
     </AuthContext.Provider>
   );

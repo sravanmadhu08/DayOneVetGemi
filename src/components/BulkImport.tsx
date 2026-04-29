@@ -1,21 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import mammoth from 'mammoth';
 import { parseQuestionsFromText } from '../services/geminiService';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, writeBatch } from 'firebase/firestore';
+import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 
 export function BulkImport() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string>('');
   const [progress, setProgress] = useState(0);
+  const [pdfs, setPdfs] = useState<any[]>([]);
+  const [selectedSourceId, setSelectedSourceId] = useState<string>('none');
+
+  useEffect(() => {
+    const fetchPdfs = async () => {
+      try {
+        const snap = await getDocs(collection(db, 'pdfs'));
+        setPdfs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+      } catch (err) {
+        console.error("Failed to fetch PDFs for bulk import context");
+      }
+    };
+    fetchPdfs();
+  }, []);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
@@ -50,7 +66,8 @@ export function BulkImport() {
         const newDocRef = doc(collection(db, path));
         batch.set(newDocRef, {
           ...q,
-          userId: user.uid,
+          userId: profile?.isAdmin ? null : user.uid,
+          sourceId: selectedSourceId !== 'none' ? selectedSourceId : null,
           createdAt: Date.now()
         });
       });
@@ -82,7 +99,24 @@ export function BulkImport() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted rounded-2xl bg-background/50 text-center cursor-pointer hover:bg-muted/50 transition-colors relative">
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Reference PDF (Context)</Label>
+            <Select value={selectedSourceId} onValueChange={setSelectedSourceId}>
+              <SelectTrigger className="h-12 rounded-xl bg-background/50 border-muted">
+                <SelectValue placeholder="Select reference from library..." />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No specific reference</SelectItem>
+                {pdfs.map(pdf => (
+                  <SelectItem key={pdf.id} value={pdf.id}>{pdf.title}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-[10px] text-muted-foreground ml-1 italic">Extracted questions will be linked to this document.</p>
+          </div>
+
+          <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted rounded-2xl bg-background/50 text-center cursor-pointer hover:bg-muted/50 transition-colors relative">
           <input 
             type="file" 
             accept=".docx" 
@@ -104,8 +138,9 @@ export function BulkImport() {
             </div>
           )}
         </div>
+      </div>
 
-        {loading && (
+      {loading && (
           <div className="space-y-2">
             <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
               <span>{status}</span>

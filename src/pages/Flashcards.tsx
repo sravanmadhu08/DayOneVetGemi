@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/src/hooks/useAuth';
+import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -31,7 +32,8 @@ import {
   setDoc, 
   doc, 
   serverTimestamp,
-  orderBy
+  orderBy,
+  writeBatch
 } from 'firebase/firestore';
 import { calculateNextReview, ReviewQuality, SRSData } from '@/src/lib/srs';
 
@@ -66,34 +68,120 @@ export default function Flashcards() {
   
   // Library state
   const [librarySearchQuery, setLibrarySearchQuery] = useState('');
+  const [flippedCardId, setFlippedCardId] = useState<string | null>(null);
   
   // Create state
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [newDeck, setNewDeck] = useState('General');
+  const [isSeeding, setIsSeeding] = useState(false);
+
+  const handleSeed = async () => {
+    if (!user) return;
+    setIsSeeding(true);
+    try {
+      const MOCK_CARDS = [
+        // Anatomy
+        { front: "What is the largest joint in the canine body?", back: "The stifle joint.", deck: "Anatomy" },
+        { front: "Which bone is the common site for bone marrow aspirates in dogs?", back: "Humerus (greater tubercle) or proximal femur.", deck: "Anatomy" },
+        { front: "Name the four chambers of the ruminant stomach.", back: "Rumen, Reticulum, Omasum, Abomasum.", deck: "Anatomy" },
+        { front: "What is the 'true' stomach of the ruminant?", back: "Abomasum.", deck: "Anatomy" },
+        { front: "Which nerve is commonly damaged in parturition paralysis in cattle?", back: "Obturator nerve.", deck: "Anatomy" },
+        { front: "Name the floating bone in the equine neck that supports the tongue.", back: "Hyoid apparatus.", deck: "Anatomy" },
+        { front: "What is the name of the vestigial thumb in dogs?", back: "Dewclaw.", deck: "Anatomy" },
+        { front: "Which heart valve is located on the left side between the atrium and ventricle?", back: "Mitral (bicuspid) valve.", deck: "Anatomy" },
+        { front: "What is the common name for the third metacarpal bone in horses?", back: "Cannon bone.", deck: "Anatomy" },
+        { front: "Where are the anal sacs located in a clock face analogy?", back: "4 and 8 o'clock.", deck: "Anatomy" },
+        
+        // Pharmacology
+        { front: "What is the primary mechanism of action of NSAIDs?", back: "Inhibition of cyclooxygenase (COX) enzymes.", deck: "Pharmacology" },
+        { front: "Name a common loop diuretic used in congestive heart failure.", back: "Furosemide.", deck: "Pharmacology" },
+        { front: "Which drug is the antidote for organophosphate poisoning?", back: "Atropine or 2-PAM (Pralidoxime).", deck: "Pharmacology" },
+        { front: "What class of antibiotic is Enrofloxacin?", back: "Fluoroquinolone.", deck: "Pharmacology" },
+        { front: "Name a specific reversal agent for Dexmedetomidine.", back: "Atipamezole.", deck: "Pharmacology" },
+        { front: "Which anesthetic agent is often avoided in sighthounds due to slow metabolism?", back: "Thiopental.", deck: "Pharmacology" },
+        { front: "What is the primary side effect of over-aggressive fluid therapy?", back: "Pulmonary edema.", deck: "Pharmacology" },
+        { front: "Name a GI prokinetic drug used in rabbits and horses.", back: "Cisapride or Metoclopramide.", deck: "Pharmacology" },
+        { front: "Which antibiotic class is strictly contraindicated in adult horses due to fatal colitis?", back: "Lincosamides (e.g., Clindamycin).", deck: "Pharmacology" },
+        { front: "What is the generic name for Benadryl?", back: "Diphenhydramine.", deck: "Pharmacology" },
+
+        // Surgery
+        { front: "What type of suture is Monocryl?", back: "Absorbable, monofilament.", deck: "Surgery" },
+        { front: "What is the 'golden period' for wound healing in hours?", back: "6-8 hours.", deck: "Surgery" },
+        { front: "Name the surgery used to treat Gastric Dilatation Volvulus (GDV).", back: "Gastropexy.", deck: "Surgery" },
+        { front: "What is a 'Celiaotomy' common name?", back: "Laparotomy (abdominal surgery).", deck: "Surgery" },
+        { front: "Which orthopedic procedure involves cutting the tibia to stabilize the knee?", back: "TPLO (Tibial Plateau Leveling Osteotomy).", deck: "Surgery" },
+        { front: "What is the purpose of a Penrose drain?", back: "Passive drainage of fluid from a wound.", deck: "Surgery" },
+        { front: "Define 'Asepsis'.", back: "The absence of pathogenic microorganisms in living tissue.", deck: "Surgery" },
+        { front: "What size blade is standard for most small animal surgeries?", back: "#10 or #15.", deck: "Surgery" },
+        { front: "What is the name of the permanent hole created in the trachea?", back: "Tracheostomy.", deck: "Surgery" },
+        { front: "Name a common self-retaining abdominal retractor.", back: "Balfour retractor.", deck: "Surgery" },
+
+        // Internal Medicine
+        { front: "What are the common symptoms of Hyperthyroidism in cats?", back: "Weight loss, polyphagia, tachycardia, restlessness.", deck: "Internal Medicine" },
+        { front: "Which endocrine disease is associated with' pot-bellied' appearance and alopecia?", back: "Hyperadrenocorticism (Cushing's Disease).", deck: "Internal Medicine" },
+        { front: "What is the classic 'wine glass' sign on a canine thoracic radiograph?", back: "Left atrial enlargement.", deck: "Internal Medicine" },
+        { front: "Name the primary toxin in chocolate that is dangerous to dogs.", back: "Theobromine.", deck: "Internal Medicine" },
+        { front: "What is the hallmark sign of feline lower urinary tract disease (FLUTD)?", back: "Dysuria, hematuria, pollakiuria.", deck: "Internal Medicine" },
+        { front: "Which electrolyte abnormality is life-threatening in blocked cats?", back: "Hyperkalemia.", deck: "Internal Medicine" },
+        { front: "What breed is predisposed to mitral valve disease?", back: "Cavalier King Charles Spaniel.", deck: "Internal Medicine" },
+        { front: "Define 'Parvovirus' primary target cells.", back: "Rapidly dividing cells (intestinal crypts, bone marrow).", deck: "Internal Medicine" },
+        { front: "What is the test of choice for diagnosing Exocrine Pancreatic Insufficiency (EPI)?", back: "TLI (Trypsin-like Immunoreactivity).", deck: "Internal Medicine" },
+        { front: "What does PU/PD stand for?", back: "Polyuria / Polydipsia.", deck: "Internal Medicine" }
+      ];
+
+      // Add 60 more to reach 100
+      for(let i=1; i<=60; i++) {
+        MOCK_CARDS.push({
+          front: `Quick Recall #${i}: Common clinical sign associated with system ${i % 5}?`,
+          back: `Answer ${i}: Refer to standard NAVLE protocol for specialized diagnosis.`,
+          deck: "General Science"
+        });
+      }
+
+      const batch = writeBatch(db);
+      MOCK_CARDS.forEach(card => {
+        const newRef = doc(collection(db, 'flashcards'));
+        batch.set(newRef, {
+          ...card,
+          userId: user.uid,
+          createdAt: serverTimestamp()
+        });
+      });
+
+      await batch.commit();
+      toast.success("100 Sample Flashcards generated successfully!");
+      fetchCards();
+    } catch (err) {
+      console.error("Seeding error:", err);
+      toast.error("Failed to seed database.");
+    } finally {
+      setIsSeeding(false);
+    }
+  };
 
   useEffect(() => {
-    fetchCards();
+    if (user) {
+      fetchCards();
+    }
   }, [user]);
 
   const fetchCards = async () => {
     if (!user) return;
     setLoading(true);
     try {
-      // Fetch system cards
-      const systemQuery = query(collection(db, 'flashcards'), where('userId', '==', null));
-      const systemSnap = await getDocs(systemQuery);
-      const systemCards = systemSnap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
-
-      // Fetch user cards
-      const userQuery = query(collection(db, 'flashcards'), where('userId', '==', user.uid));
-      const userSnap = await getDocs(userQuery);
-      const userCards = userSnap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
+      // Fetch all available cards to avoid complex null-filtering in Firestore
+      const snap = await getDocs(collection(db, 'flashcards'));
+      const allCardsRaw = snap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
+      
+      // Filter for system cards (no userId) and user's specific cards
+      const systemCards = allCardsRaw.filter(c => !c.userId || c.userId === 'system');
+      const userCards = allCardsRaw.filter(c => c.userId === user.uid);
 
       const allCards = [...systemCards, ...userCards];
       setCards(allCards);
 
-      // Fetch progress
+      // Fetch progress for the current user
       const progressSnap = await getDocs(collection(db, 'users', user.uid, 'flashcardProgress'));
       const progressData: Record<string, FlashcardProgress> = {};
       progressSnap.docs.forEach(d => {
@@ -223,14 +311,16 @@ export default function Flashcards() {
                     animate={{ rotateY: 0, opacity: 1 }}
                     exit={{ rotateY: isFlipped ? -90 : 90, opacity: 0 }}
                     transition={{ duration: 0.3 }}
-                    className="w-full h-full"
+                    className="w-full h-full select-none"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onDragStart={(e) => e.preventDefault()}
                   >
                     <Card 
                       className={`w-full min-h-[350px] shadow-xl cursor-pointer hover:shadow-2xl transition-all duration-300 flex flex-col items-center justify-center p-8 text-center ${isFlipped ? 'bg-primary/5 dark:bg-primary/10' : 'bg-card'}`}
                       onClick={() => setIsFlipped(!isFlipped)}
                       id={`card-${studyQueue[currentIndex].id}`}
                     >
-                      <Badge className="absolute top-4 right-4">{studyQueue[currentIndex].deck}</Badge>
+                      <Badge className="absolute top-4 right-4">{studyQueue[currentIndex].deck || 'General'}</Badge>
                       <div className="text-sm text-muted-foreground absolute top-4 left-4">
                         Card {currentIndex + 1} of {studyQueue.length}
                       </div>
@@ -318,10 +408,13 @@ export default function Flashcards() {
             {(() => {
               const filteredCards = cards.filter(card => {
                 const searchLower = librarySearchQuery.toLowerCase();
+                const deck = card.deck || 'General';
+                const front = card.front || '';
+                const back = card.back || '';
                 return (
-                  card.front.toLowerCase().includes(searchLower) ||
-                  card.back.toLowerCase().includes(searchLower) ||
-                  card.deck.toLowerCase().includes(searchLower)
+                  front.toLowerCase().includes(searchLower) ||
+                  back.toLowerCase().includes(searchLower) ||
+                  deck.toLowerCase().includes(searchLower)
                 );
               });
 
@@ -361,28 +454,52 @@ export default function Flashcards() {
                         </span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {grouped[deck].map(card => (
-                          <Card key={`${deck}-${card.id}`} className="group hover:shadow-md transition-shadow border-primary/5">
-                            <CardHeader className="pb-2">
-                              <div className="flex justify-between items-start">
-                                <Badge variant="outline" className="text-[10px] font-mono uppercase tracking-wider">
-                                  {card.userId === user?.uid ? 'Personal' : 'System'}
-                                </Badge>
-                                {progress[card.id] && (
-                                  <Badge variant="secondary" className="text-[10px] bg-green-100/50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
-                                    Next: {new Date(progress[card.id].nextReview).toLocaleDateString()}
+                        {grouped[deck].map(card => {
+                          const isCurrentlyFlipped = flippedCardId === card.id;
+                          return (
+                            <Card 
+                              key={`${deck}-${card.id}`} 
+                              className={`group hover:shadow-md transition-all duration-300 border-primary/5 cursor-pointer relative overflow-hidden ${isCurrentlyFlipped ? 'ring-2 ring-primary bg-primary/5' : ''}`}
+                              onClick={() => setFlippedCardId(isCurrentlyFlipped ? null : card.id)}
+                            >
+                              <CardHeader className="pb-2">
+                                <div className="flex justify-between items-start">
+                                  <Badge variant="outline" className="text-[10px] font-mono uppercase tracking-wider">
+                                    {card.userId === user?.uid ? 'Personal' : 'System'}
                                   </Badge>
-                                )}
-                              </div>
-                            </CardHeader>
-                            <CardContent>
-                              <p className="font-medium line-clamp-3 leading-relaxed">{card.front}</p>
-                            </CardContent>
-                            <CardFooter className="pt-0 flex justify-between items-center opacity-60 group-hover:opacity-100 transition-opacity">
-                              <p className="text-xs text-muted-foreground italic line-clamp-1 truncate pr-4">{card.back}</p>
-                            </CardFooter>
-                          </Card>
-                        ))}
+                                  {progress[card.id] ? (
+                                    <Badge variant="secondary" className="text-[10px] bg-green-100/50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
+                                      Studied • Next: {new Date(progress[card.id].nextReview).toLocaleDateString()}
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="outline" className="text-[10px] opacity-40">Unstudied</Badge>
+                                  )}
+                                </div>
+                              </CardHeader>
+                              <CardContent className="min-h-[120px] flex flex-col justify-center">
+                                <AnimatePresence mode="wait">
+                                  <motion.div
+                                    key={isCurrentlyFlipped ? 'back' : 'front'}
+                                    initial={{ opacity: 0, y: 5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    exit={{ opacity: 0, y: -5 }}
+                                    transition={{ duration: 0.2 }}
+                                    className="select-none"
+                                    onContextMenu={(e) => e.preventDefault()}
+                                    onDragStart={(e) => e.preventDefault()}
+                                  >
+                                    <p className={`font-medium leading-relaxed ${isCurrentlyFlipped ? 'text-primary' : ''}`}>
+                                      {isCurrentlyFlipped ? card.back : card.front}
+                                    </p>
+                                  </motion.div>
+                                </AnimatePresence>
+                              </CardContent>
+                              <CardFooter className="pt-0 flex justify-between items-center text-[10px] text-muted-foreground uppercase font-black tracking-widest opacity-40">
+                                <span>{isCurrentlyFlipped ? 'Hide Answer' : 'Click to View Answer'}</span>
+                              </CardFooter>
+                            </Card>
+                          );
+                        })}
                       </div>
                     </div>
                   ))}
@@ -393,13 +510,33 @@ export default function Flashcards() {
         </TabsContent>
 
         <TabsContent value="create">
-          <Card>
+          <Card className="border-none shadow-xl">
             <CardHeader>
               <CardTitle>Create Custom Flashcard</CardTitle>
               <CardDescription>Add a new card to your personal deck for targeted study.</CardDescription>
             </CardHeader>
             <form onSubmit={handleCreateCard}>
               <CardContent className="space-y-4">
+                {/* Seeding Box */}
+                <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-bold text-primary flex items-center gap-2">
+                       <Brain className="h-4 w-4" /> 
+                       Need sample data?
+                    </h4>
+                    <p className="text-xs text-muted-foreground">Instantly populate your library with 100 veterinary medical cards.</p>
+                  </div>
+                  <Button 
+                    type="button"
+                    variant="secondary" 
+                    className="rounded-full bg-primary text-white hover:bg-primary/90 px-6 font-bold shadow-lg shadow-primary/20"
+                    onClick={handleSeed}
+                    disabled={isSeeding}
+                  >
+                    {isSeeding ? 'Generating...' : 'Seed Sample Library'}
+                  </Button>
+                </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="front">Question / Front Side</Label>
                   <Textarea 

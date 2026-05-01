@@ -142,7 +142,7 @@ export default function ModuleDetail() {
   };
 
   return (
-    <div className={`relative ${isFullscreen ? 'fixed inset-0 z-[100] bg-background overflow-y-auto px-4 py-8 animate-in fade-in zoom-in-95 duration-300' : 'max-w-6xl mx-auto space-y-8 px-4 pb-20'}`}>
+    <div className={`relative ${isFullscreen ? 'fixed inset-0 z-[100] bg-background overflow-y-auto px-4 py-8 animate-in fade-in zoom-in-95 duration-300' : 'max-w-6xl mx-auto space-y-6 px-4 pb-20'}`}>
       {/* Progress Indicator */}
       {!isFullscreen && (
         <div className="fixed bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border z-50 py-3 px-6 h-16 flex items-center justify-center">
@@ -231,13 +231,13 @@ export default function ModuleDetail() {
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4">
               <div>
-                <h1 className="text-4xl font-black tracking-tight leading-tight">{module.title}</h1>
-                <p className="text-lg text-muted-foreground font-medium flex items-center gap-2 mt-2">
+                <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight leading-tight">{module.title}</h1>
+                <p className="text-base sm:text-lg text-muted-foreground font-medium flex items-center gap-2 mt-2">
                     <BookOpen className="h-4 w-4 text-primary" /> {module.category}
                 </p>
               </div>
-              <div className="flex flex-col items-center md:items-end gap-2">
-                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Section {currentSection + 1} of {sections.length}</span>
+              <div className="flex flex-col items-start md:items-end gap-2 shrink-0">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground bg-muted/50 px-3 py-1 rounded-full border border-border/50">Section {currentSection + 1} of {sections.length}</span>
               </div>
             </div>
           </div>
@@ -249,7 +249,7 @@ export default function ModuleDetail() {
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.3 }}
-              className="prose prose-slate dark:prose-invert max-w-none bg-background border p-8 md:p-12 rounded-[32px] shadow-sm border-border/50 min-h-[500px] break-words select-none"
+              className="prose prose-slate dark:prose-invert max-w-none bg-background border p-5 sm:p-8 md:p-10 rounded-[24px] sm:rounded-[32px] shadow-sm border-border/50 min-h-[500px] break-words select-none"
               onContextMenu={(e) => e.preventDefault()}
               onDragStart={(e) => e.preventDefault()}
             >
@@ -265,7 +265,7 @@ export default function ModuleDetail() {
             </motion.div>
           </AnimatePresence>
 
-          <div className="bg-primary/5 border border-primary/20 p-8 rounded-[32px] flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
+          <div className="bg-primary/5 border border-primary/20 p-6 rounded-[32px] flex flex-col md:flex-row items-center justify-between gap-6 overflow-hidden relative">
             <div className="absolute -right-4 -bottom-4 opacity-5 pointer-events-none">
                 <GraduationCap className="h-32 w-32 rotate-12" />
             </div>
@@ -302,7 +302,7 @@ export default function ModuleDetail() {
                             }}
                             className={`w-full text-left px-4 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-between group ${
                                 currentSection === i 
-                                ? 'bg-primary text-white shadow-lg shadow-primary/20 scale-[1.02]' 
+                                ? 'bg-primary text-primary-foreground shadow-lg shadow-primary/20 scale-[1.02]' 
                                 : 'hover:bg-muted text-muted-foreground hover:text-foreground'
                             }`}
                         >

@@ -10,9 +10,9 @@ import {
   User as UserIcon, 
   LogOut,
   Brain,
-  Timer as TimerIcon,
   TrendingUp,
-  Upload
+  Settings,
+  LayoutDashboard
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -25,8 +25,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { buttonVariants } from '@/components/ui/button';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { ThemeToggle } from './ThemeToggle';
 
 export default function Navbar() {
@@ -36,21 +35,23 @@ export default function Navbar() {
   const [isOpen, setIsOpen] = useState(false);
 
   const navItems = [
+    { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     { name: 'Flashcards', path: '/flashcards', icon: Brain },
-    { name: 'Study Modules', path: '/modules', icon: BookOpen },
+    { name: 'Modules', path: '/modules', icon: BookOpen },
     { name: 'Quizzes', path: '/quizzes', icon: GraduationCap },
-    { name: 'Analytics', path: '/progress', icon: TrendingUp },
   ];
 
   const NavContent = ({ mobile = false }) => (
-    <div className={mobile ? 'flex flex-col space-y-4 mt-8' : 'flex items-center space-x-6'}>
+    <div className={mobile ? 'flex flex-col space-y-6 mt-12 px-2' : 'flex items-center space-x-1'}>
       {navItems.map((item) => (
         <Link
           key={item.path}
           to={item.path}
           onClick={() => setIsOpen(false)}
-          className={`flex items-center space-x-1.5 text-sm font-semibold transition-all hover:text-primary ${
-            location.pathname === item.path ? 'text-primary' : 'text-muted-foreground'
+          className={`flex items-center gap-2 px-4 py-2 text-xs font-black uppercase tracking-widest transition-all rounded-xl ${
+            location.pathname === item.path 
+              ? 'bg-primary/10 text-primary' 
+              : 'text-muted-foreground hover:bg-muted hover:text-foreground'
           }`}
         >
           <item.icon className="h-4 w-4" />
@@ -61,74 +62,115 @@ export default function Navbar() {
   );
 
   return (
-    <nav className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-      <div className="container mx-auto flex h-16 items-center justify-between px-4">
-        <div className="flex items-center space-x-4">
-          <Link to="/" className="flex items-center space-x-2">
-            <div className="rounded-lg bg-primary p-1.5 text-primary-foreground">
-              <Stethoscope className="h-6 w-6" />
+    <nav className="sticky top-0 z-50 w-full bg-background/80 backdrop-blur-xl border-b border-border/50">
+      <div className="max-w-[1400px] mx-auto flex h-16 items-center justify-between px-4 sm:px-6">
+        <div className="flex items-center gap-10">
+          <Link to="/" className="flex items-center gap-2.5 transition-transform active:scale-95">
+            <div className="rounded-xl bg-primary p-2 text-primary-foreground shadow-lg shadow-primary/20">
+              <Stethoscope className="h-5 w-5" />
             </div>
-            <span className="text-xl font-bold tracking-tighter">Vetica</span>
+            <span className="text-xl font-black tracking-tighter text-foreground hidden sm:block">
+              DayOne<span className="text-primary italic">Vet</span>
+            </span>
           </Link>
-          <div className="hidden md:flex">
+          
+          <div className="hidden lg:flex">
             <NavContent />
           </div>
         </div>
 
-        <div className="flex items-center space-x-4">
-          <ThemeToggle />
+        <div className="flex items-center gap-2 sm:gap-4">
+          <div className="hidden sm:flex">
+            <ThemeToggle />
+          </div>
 
           {user ? (
             <DropdownMenu>
-              <DropdownMenuTrigger className="relative h-8 w-8 rounded-full focus:outline-none">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={profile?.photoURL || ''} alt={profile?.displayName || ''} />
-                  <AvatarFallback>{profile?.displayName?.[0] || 'U'}</AvatarFallback>
-                </Avatar>
+              <DropdownMenuTrigger className="group focus:outline-none">
+                <div className="flex items-center gap-3 p-1 rounded-full border border-transparent group-hover:border-border/50 group-hover:bg-muted/30 transition-all pr-3">
+                  <Avatar className="h-8 w-8 rounded-lg shadow-sm border border-border/50">
+                    <AvatarImage src={profile?.photoURL || ''} alt={profile?.displayName || ''} className="rounded-lg" />
+                    <AvatarFallback className="rounded-lg font-black text-[10px]">{profile?.displayName?.[0] || 'U'}</AvatarFallback>
+                  </Avatar>
+                  <div className="hidden sm:flex flex-col items-start leading-none gap-1">
+                    <span className="text-xs font-black text-foreground">{profile?.displayName}</span>
+                    {profile?.isAdmin && <span className="text-[8px] font-black uppercase tracking-widest text-primary">Staff Access</span>}
+                  </div>
+                </div>
               </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-56" align="end">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{profile?.displayName}</p>
-                      <p className="text-xs leading-none text-muted-foreground">{profile?.email}</p>
-                    </div>
-                  </DropdownMenuLabel>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuGroup>
-                  {user?.email === 'sravan96mufc@gmail.com' && (
-                    <DropdownMenuItem onClick={() => navigate('/import')}>
-                      <Upload className="mr-2 h-4 w-4" />
-                      <span>Import Questions</span>
+              <DropdownMenuContent className="w-56 mt-2 rounded-2xl p-2 shadow-2xl" align="end">
+                <DropdownMenuLabel className="px-3 py-2">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-xs font-black text-foreground uppercase tracking-widest leading-none mb-1">Authenticated</p>
+                    <p className="text-[10px] font-medium text-muted-foreground truncate">{profile?.email}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="my-2 bg-border/50" />
+                <DropdownMenuGroup className="space-y-1">
+                  {profile?.isAdmin && (
+                    <DropdownMenuItem 
+                      onClick={() => navigate('/admin/settings')}
+                      className="rounded-xl font-bold text-xs py-2 data-[highlighted]:bg-primary/10 data-[highlighted]:text-primary"
+                    >
+                      <Settings className="mr-3 h-4 w-4" />
+                      Admin Control
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuItem onClick={() => navigate('/profile')}>
-                    <UserIcon className="mr-2 h-4 w-4" />
-                    <span>Profile</span>
+                  <DropdownMenuItem 
+                    onClick={() => navigate('/profile')}
+                    className="rounded-xl font-bold text-xs py-2"
+                  >
+                    <UserIcon className="mr-3 h-4 w-4" />
+                    Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => logout()}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    <span>Log out</span>
+                  <DropdownMenuItem 
+                    onClick={() => navigate('/progress')}
+                    className="rounded-xl font-bold text-xs py-2 sm:hidden"
+                  >
+                    <TrendingUp className="mr-3 h-4 w-4" />
+                    Analytics
                   </DropdownMenuItem>
                 </DropdownMenuGroup>
+                <DropdownMenuSeparator className="my-2 bg-border/50" />
+                <DropdownMenuItem 
+                  onClick={() => logout()}
+                  className="rounded-xl font-bold text-xs py-2 text-destructive data-[highlighted]:bg-destructive/10 data-[highlighted]:text-destructive"
+                >
+                  <LogOut className="mr-3 h-4 w-4" />
+                  Terminate Session
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Button onClick={signIn} size="sm">Sign In</Button>
+            <Button 
+              onClick={signIn} 
+              size="sm" 
+              className="rounded-xl font-black uppercase tracking-widest text-[10px] h-9 px-5 shadow-lg shadow-primary/20"
+            >
+              Sign In
+            </Button>
           )}
 
-          <div className="md:hidden">
+          <div className="lg:hidden ml-1">
             <Sheet open={isOpen} onOpenChange={setIsOpen}>
-              <SheetTrigger
-                render={(props) => (
-                  <Button {...props} variant="ghost" size="icon">
-                    <Menu className="h-6 w-6" />
-                  </Button>
-                )}
-              />
-              <SheetContent side="left">
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon" className="rounded-xl hover:bg-muted h-9 w-9">
+                  <Menu className="h-5 w-5" />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-[300px] sm:w-[400px] border-l border-border/50">
+                <SheetHeader className="text-left border-b border-border/50 pb-6">
+                  <SheetTitle className="text-xl font-black tracking-tighter">
+                    DayOne<span className="text-primary italic">Vet</span>
+                  </SheetTitle>
+                  <SheetDescription className="text-xs font-bold uppercase tracking-widest opacity-50 px-0.5">
+                    Navigation Menu
+                  </SheetDescription>
+                </SheetHeader>
                 <NavContent mobile />
+                <div className="mt-8 pt-8 border-t border-border/50 px-2 sm:hidden">
+                   <ThemeToggle />
+                </div>
               </SheetContent>
             </Sheet>
           </div>
@@ -137,3 +179,4 @@ export default function Navbar() {
     </nav>
   );
 }
+

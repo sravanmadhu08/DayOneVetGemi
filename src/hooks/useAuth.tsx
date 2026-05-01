@@ -4,8 +4,9 @@ import {
   User
 } from 'firebase/auth';
 import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db, handleFirestoreError, OperationType, googleProvider, signInWithPopup, signOut } from '@/src/lib/firebase';
+import { auth, db, handleFirestoreError, OperationType, googleProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from '@/src/lib/firebase';
 import { UserProfile, GlobalSettings } from '@/src/types';
+import { toast } from 'sonner';
 
 interface AuthContextType {
   user: User | null;
@@ -13,6 +14,9 @@ interface AuthContextType {
   globalSettings: GlobalSettings | null;
   loading: boolean;
   signIn: () => Promise<void>;
+  signInWithEmail: (email: string, pass: string) => Promise<void>;
+  signUpWithEmail: (email: string, pass: string, name: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
   logout: () => Promise<void>;
   updateProgress: (moduleId: string, score: number) => Promise<void>;
   updateQuizStats: (score: number, totalQuestions: number, correctAnswers: number) => Promise<void>;
@@ -83,8 +87,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signIn = async () => {
     try {
       await signInWithPopup(auth, googleProvider);
-    } catch (error) {
+    } catch (error: any) {
+      if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
+        return;
+      }
+      if (error.code === 'auth/user-disabled') {
+        toast.error("This account has been disabled. Please contact support.");
+        return;
+      }
       console.error("Sign in error", error);
+      toast.error("Failed to sign in. Please try again.");
+    }
+  };
+
+  const signInWithEmail = async (email: string, pass: string) => {
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error: any) {
+       console.error("Email sign in error", error);
+       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+         toast.error("Invalid email or password");
+       } else {
+         toast.error("Failed to sign in. Please try again.");
+       }
+    }
+  };
+
+  const signUpWithEmail = async (email: string, pass: string, name: string) => {
+    try {
+      const { user } = await createUserWithEmailAndPassword(auth, email, pass);
+      // Profile will be created by the onAuthStateChanged listener
+      // but we might want to set the display name immediately if possible
+      // though Firebase onAuthStateChanged is usually fast enough.
+      // We can update the profile explicitly here too if needed.
+      await setDoc(doc(db, 'users', user.uid), {
+        uid: user.uid,
+        email: email,
+        displayName: name,
+        createdAt: Date.now(),
+        progress: {}
+      }, { merge: true });
+    } catch (error: any) {
+      console.error("Email sign up error", error);
+      if (error.code === 'auth/email-already-in-use') {
+        toast.error("Email already in use");
+      } else {
+        toast.error("Failed to create account. Please try again.");
+      }
+    }
+  };
+
+  const resetPassword = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+      toast.success("Password reset email sent!");
+    } catch (error: any) {
+      console.error("Password reset error", error);
+      toast.error("Failed to send reset email.");
     }
   };
 
@@ -220,7 +279,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, profile, globalSettings, loading, signIn, logout, updateProgress, updateQuizStats, updateProfile, promoteToAdmin, promoteOtherToAdmin, updateGlobalSettings, subscribe }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      profile, 
+      globalSettings, 
+      loading, 
+      signIn, 
+      signInWithEmail, 
+      signUpWithEmail, 
+      resetPassword, 
+      logout, 
+      updateProgress, 
+      updateQuizStats, 
+      updateProfile, 
+      promoteToAdmin, 
+      promoteOtherToAdmin, 
+      updateGlobalSettings, 
+      subscribe 
+    }}>
       {children}
     </AuthContext.Provider>
   );

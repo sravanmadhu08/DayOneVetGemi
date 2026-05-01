@@ -1,255 +1,194 @@
 {
   "entities": {
-    "User": {
+    "UserProfile": {
       "title": "User Profile",
-      "description": "User account and progress data",
+      "description": "Store user specific information and overall progress",
       "type": "object",
       "properties": {
         "uid": { "type": "string" },
         "email": { "type": "string" },
         "displayName": { "type": "string" },
         "photoURL": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "number" },
         "isAdmin": { "type": "boolean" },
         "bio": { "type": "string" },
         "specialty": { "type": "string" },
         "institution": { "type": "string" },
         "subscriptionPlan": { "type": "string" },
-        "subscriptionUntil": { "type": "string", "format": "date-time" },
-        "quizStats": {
-          "type": "object",
-          "properties": {
-            "completed": { "type": "integer" },
-            "averageScore": { "type": "number" },
-            "lastScore": { "type": "number" },
-            "totalQuestions": { "type": "integer" },
-            "correctAnswers": { "type": "integer" }
-          }
-        },
-        "progress": {
-          "type": "object",
-          "description": "Progress in modules and quizzes"
-        }
+        "subscriptionUntil": { "type": "number" },
+        "progress": { "type": "object" },
+        "quizStats": { "type": "object" }
       },
       "required": ["uid", "email", "createdAt"]
     },
     "Flashcard": {
       "title": "Flashcard",
-      "description": "Study card with front and back content",
+      "description": "Global flashcards for studying",
       "type": "object",
       "properties": {
-        "userId": { "type": "string", "description": "ID of the creator (null for system cards)" },
+        "id": { "type": "string" },
         "front": { "type": "string" },
         "back": { "type": "string" },
         "deck": { "type": "string" },
-        "tags": { "type": "array", "items": { "type": "string" } },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "userId": { "type": "string" },
+        "tags": { "type": "array" },
+        "createdAt": { "type": "number" }
       },
-      "required": ["front", "back"]
+      "required": ["front", "back", "deck", "createdAt"]
     },
     "FlashcardProgress": {
       "title": "Flashcard Progress",
-      "description": "User's SRS progress for a specific flashcard",
+      "description": "SRS data for a specific card for a user",
       "type": "object",
       "properties": {
         "cardId": { "type": "string" },
         "interval": { "type": "number" },
         "ease": { "type": "number" },
-        "nextReview": { "type": "number", "description": "Timestamp" },
-        "lastReviewed": { "type": "number", "description": "Timestamp" },
-        "consecutiveCorrect": { "type": "integer" }
+        "nextReview": { "type": "number" },
+        "lastReviewed": { "type": "number" },
+        "consecutiveCorrect": { "type": "number" }
       },
-      "required": ["cardId", "nextReview"]
+      "required": ["cardId", "interval", "ease", "nextReview", "consecutiveCorrect"]
     },
     "StudyModule": {
       "title": "Study Module",
-      "description": "Educational content module",
+      "description": "Rich content for learning clinical concepts",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "title": { "type": "string" },
         "category": { "type": "string" },
-        "content": { "type": "string", "description": "Markdown content" },
-        "order": { "type": "integer" },
-        "sections": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "title": { "type": "string" },
-              "content": { "type": "string" }
-            },
-            "required": ["title", "content"]
-          }
-        }
+        "content": { "type": "string" },
+        "order": { "type": "number" },
+        "sections": { "type": "array" }
       },
-      "required": ["title", "content"]
-    },
-    "Quiz": {
-      "title": "Quiz",
-      "description": "Knowledge assessment",
-      "type": "object",
-      "properties": {
-        "moduleId": { "type": "string" },
-        "title": { "type": "string" },
-        "questions": {
-          "type": "array",
-          "items": {
-            "type": "object",
-            "properties": {
-              "question": { "type": "string" },
-              "options": { "type": "array", "items": { "type": "string" } },
-              "correctAnswer": { "type": "integer" },
-              "explanation": { "type": "string" },
-              "sourceId": { "type": "string", "description": "Reference to a PdfDocument id" },
-              "species": { "type": "array", "items": { "type": "string" } },
-              "system": { "type": "string" }
-            }
-          }
-        }
-      },
-      "required": ["title", "questions"]
+      "required": ["title", "category", "content", "order"]
     },
     "Question": {
-       "title": "Practice Question",
-       "description": "Individual practice question in the global pool",
-       "type": "object",
-       "properties": {
-         "userId": { "type": "string", "description": "Creator ID (null for system questions)" },
-         "question": { "type": "string" },
-         "options": { "type": "array", "items": { "type": "string" } },
-         "correctAnswer": { "type": "integer" },
-         "explanation": { "type": "string" },
-         "species": { "type": "array", "items": { "type": "string" } },
-         "system": { "type": "string" },
-         "sourceId": { "type": "string", "description": "Reference to a PdfDocument id" },
-         "createdAt": { "type": "string", "format": "date-time" }
-       },
-       "required": ["question", "options", "correctAnswer", "species", "system"]
-    },
-    "QuizHistory": {
-      "title": "Quiz Result",
-      "description": "Historical quiz performance data",
+      "title": "Question",
+      "description": "Quiz questions for testing knowledge",
       "type": "object",
       "properties": {
-        "score": { "type": "number" },
-        "total": { "type": "integer" },
-        "correct": { "type": "integer" },
-        "timestamp": { "type": "string", "format": "date-time" },
+        "id": { "type": "string" },
+        "question": { "type": "string" },
+        "options": { "type": "array" },
+        "correctAnswer": { "type": "number" },
+        "explanation": { "type": "string" },
+        "species": { "type": "array" },
         "system": { "type": "string" },
-        "species": { "type": "string" }
+        "sourceId": { "type": "string" }
       },
-      "required": ["score", "total", "correct", "timestamp"]
-    },
-    "CompletedPracticeQuestion": {
-      "title": "Completed Practice Question",
-      "description": "A record of a practice question answered correctly",
-      "type": "object",
-      "properties": {
-        "questionId": { "type": "string" },
-        "completedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["questionId", "completedAt"]
-    },
-    "ModuleProgress": {
-      "title": "Module Progress",
-      "description": "User's progress through a specific study module",
-      "type": "object",
-      "properties": {
-        "moduleId": { "type": "string" },
-        "currentSection": { "type": "integer" },
-        "totalSections": { "type": "integer" },
-        "completed": { "type": "boolean" },
-        "completedAt": { "type": "string", "format": "date-time" },
-        "lastReadAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["moduleId", "currentSection", "totalSections"]
+      "required": ["question", "options", "correctAnswer", "explanation", "species", "system"]
     },
     "PdfDocument": {
       "title": "PDF Document",
-      "description": "Metadata for a study PDF",
+      "description": "Library of PDF resources",
       "type": "object",
       "properties": {
-        "userId": { "type": "string", "description": "Uploader ID (null for system files)" },
+        "id": { "type": "string" },
         "title": { "type": "string" },
         "author": { "type": "string" },
         "size": { "type": "string" },
         "url": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "userId": { "type": "string" },
+        "createdAt": { "type": "number" }
       },
-      "required": ["title", "url", "createdAt"]
+      "required": ["title", "author", "url"]
     },
     "Guideline": {
-      "title": "Clinical Guideline",
-      "description": "Veterinary clinical guidelines",
+      "title": "Guideline",
+      "description": "Clinical practice guidelines",
       "type": "object",
       "properties": {
+        "id": { "type": "string" },
         "title": { "type": "string" },
-        "author": { "type": "string" },
-        "date": { "type": "string" },
-        "summary": { "type": "string" },
-        "url": { "type": "string" },
-        "createdAt": { "type": "string", "format": "date-time" }
+        "content": { "type": "string" },
+        "category": { "type": "string" }
       },
-      "required": ["title", "summary"]
+      "required": ["title", "content", "category"]
     },
-    "GlobalSettings": {
-      "title": "Global System Settings",
-      "description": "Application-wide settings managed by admin",
+    "Resource": {
+      "title": "Resource",
+      "description": "External veterinary resources",
       "type": "object",
       "properties": {
-        "isFreeMode": { "type": "boolean" }
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "url": { "type": "string" },
+        "type": { "type": "string" },
+        "order": { "type": "number" }
       },
-      "required": ["isFreeMode"]
+      "required": ["title", "url", "type", "order"]
+    },
+    "ModuleProgress": {
+      "title": "Module Progress",
+      "description": "Detailed progress tracking for a study module",
+      "type": "object",
+      "properties": {
+        "moduleId": { "type": "string" },
+        "currentSection": { "type": "number" },
+        "totalSections": { "type": "number" },
+        "completed": { "type": "boolean" }
+      },
+      "required": ["moduleId", "currentSection", "totalSections", "completed"]
+    },
+    "QuizResult": {
+      "title": "Quiz Result",
+      "description": "Historical record of a completed quiz session",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "score": { "type": "number" },
+        "total": { "type": "number" },
+        "correct": { "type": "number" },
+        "timestamp": { "type": "object" },
+        "system": { "type": "string" },
+        "species": { "type": "string" }
+      },
+      "required": ["score", "total", "correct", "timestamp", "system", "species"]
     }
   },
   "firestore": {
-    "/settings/{settingId}": {
-      "schema": "GlobalSettings",
-      "description": "Global application configuration"
-    },
     "/users/{userId}": {
-      "schema": "User",
-      "description": "User profiles"
+      "schema": "UserProfile",
+      "description": "User profiles and progress"
     },
     "/users/{userId}/flashcardProgress/{cardId}": {
       "schema": "FlashcardProgress",
-      "description": "User's SRS progress for cards"
-    },
-    "/users/{userId}/quizHistory/{historyId}": {
-      "schema": "QuizHistory",
-      "description": "Historical quiz results for analytics"
-    },
-    "/users/{userId}/completedPracticeQuestions/{questionId}": {
-      "schema": "CompletedPracticeQuestion",
-      "description": "Correctly answered practice questions"
+      "description": "User specific SRS data for flashcards"
     },
     "/users/{userId}/moduleProgress/{moduleId}": {
       "schema": "ModuleProgress",
-      "description": "Detailed progress tracking for individual modules"
+      "description": "Detailed module progress"
+    },
+    "/users/{userId}/quizHistory/{quizId}": {
+      "schema": "QuizResult",
+      "description": "User quiz history"
+    },
+    "/questions/{questionId}": {
+      "schema": "Question",
+      "description": "Global question pool"
     },
     "/flashcards/{cardId}": {
       "schema": "Flashcard",
-      "description": "Flashcards repository"
+      "description": "Global flashcard pool"
     },
     "/modules/{moduleId}": {
       "schema": "StudyModule",
       "description": "Study modules"
     },
-    "/quizzes/{quizId}": {
-      "schema": "Quiz",
-      "description": "Quizzes for modules or cases"
-    },
     "/pdfs/{pdfId}": {
       "schema": "PdfDocument",
-      "description": "Library of PDF study materials"
+      "description": "PDF library"
     },
-    "/questions/{questionId}": {
-      "schema": "Question",
-      "description": "Practice questions library"
-    },
-    "/guidelines/{guidelineId}": {
+    "/guidelines/{guideId}": {
       "schema": "Guideline",
       "description": "Clinical guidelines"
+    },
+    "/resources/{resId}": {
+      "schema": "Resource",
+      "description": "External resources"
     }
   }
 }

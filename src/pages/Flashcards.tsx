@@ -20,22 +20,27 @@ import {
   ChevronRight,
   Flame,
   Calendar,
-  History
+  Zap,
+  Command,
+  Search,
+  Sparkles,
+  ThumbsUp,
+  ThumbsDown,
+  Clock,
+  LayoutGrid
 } from 'lucide-react';
-import { db } from '@/src/lib/firebase';
+import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { 
   collection, 
-  query, 
-  where, 
-  getDocs, 
   addDoc, 
-  setDoc, 
-  doc, 
   serverTimestamp,
-  orderBy,
-  writeBatch
+  onSnapshot,
+  query,
+  where
 } from 'firebase/firestore';
-import { calculateNextReview, ReviewQuality, SRSData } from '@/src/lib/srs';
+import { calculateNextReview, ReviewQuality } from '@/src/lib/srs';
+import { firebaseService } from '@/src/services/firebaseService';
+import ReactMarkdown from 'react-markdown';
 
 interface Flashcard {
   id: string;
@@ -51,11 +56,12 @@ interface FlashcardProgress {
   interval: number;
   ease: number;
   nextReview: number;
+  lastReviewed: number;
   consecutiveCorrect: number;
 }
 
 export default function Flashcards() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [activeTab, setActiveTab] = useState('study');
   const [cards, setCards] = useState<Flashcard[]>([]);
   const [progress, setProgress] = useState<Record<string, FlashcardProgress>>({});
@@ -74,138 +80,72 @@ export default function Flashcards() {
   const [newFront, setNewFront] = useState('');
   const [newBack, setNewBack] = useState('');
   const [newDeck, setNewDeck] = useState('General');
-  const [isSeeding, setIsSeeding] = useState(false);
 
-  const handleSeed = async () => {
-    if (!user) return;
-    setIsSeeding(true);
-    try {
-      const MOCK_CARDS = [
-        // Anatomy
-        { front: "What is the largest joint in the canine body?", back: "The stifle joint.", deck: "Anatomy" },
-        { front: "Which bone is the common site for bone marrow aspirates in dogs?", back: "Humerus (greater tubercle) or proximal femur.", deck: "Anatomy" },
-        { front: "Name the four chambers of the ruminant stomach.", back: "Rumen, Reticulum, Omasum, Abomasum.", deck: "Anatomy" },
-        { front: "What is the 'true' stomach of the ruminant?", back: "Abomasum.", deck: "Anatomy" },
-        { front: "Which nerve is commonly damaged in parturition paralysis in cattle?", back: "Obturator nerve.", deck: "Anatomy" },
-        { front: "Name the floating bone in the equine neck that supports the tongue.", back: "Hyoid apparatus.", deck: "Anatomy" },
-        { front: "What is the name of the vestigial thumb in dogs?", back: "Dewclaw.", deck: "Anatomy" },
-        { front: "Which heart valve is located on the left side between the atrium and ventricle?", back: "Mitral (bicuspid) valve.", deck: "Anatomy" },
-        { front: "What is the common name for the third metacarpal bone in horses?", back: "Cannon bone.", deck: "Anatomy" },
-        { front: "Where are the anal sacs located in a clock face analogy?", back: "4 and 8 o'clock.", deck: "Anatomy" },
-        
-        // Pharmacology
-        { front: "What is the primary mechanism of action of NSAIDs?", back: "Inhibition of cyclooxygenase (COX) enzymes.", deck: "Pharmacology" },
-        { front: "Name a common loop diuretic used in congestive heart failure.", back: "Furosemide.", deck: "Pharmacology" },
-        { front: "Which drug is the antidote for organophosphate poisoning?", back: "Atropine or 2-PAM (Pralidoxime).", deck: "Pharmacology" },
-        { front: "What class of antibiotic is Enrofloxacin?", back: "Fluoroquinolone.", deck: "Pharmacology" },
-        { front: "Name a specific reversal agent for Dexmedetomidine.", back: "Atipamezole.", deck: "Pharmacology" },
-        { front: "Which anesthetic agent is often avoided in sighthounds due to slow metabolism?", back: "Thiopental.", deck: "Pharmacology" },
-        { front: "What is the primary side effect of over-aggressive fluid therapy?", back: "Pulmonary edema.", deck: "Pharmacology" },
-        { front: "Name a GI prokinetic drug used in rabbits and horses.", back: "Cisapride or Metoclopramide.", deck: "Pharmacology" },
-        { front: "Which antibiotic class is strictly contraindicated in adult horses due to fatal colitis?", back: "Lincosamides (e.g., Clindamycin).", deck: "Pharmacology" },
-        { front: "What is the generic name for Benadryl?", back: "Diphenhydramine.", deck: "Pharmacology" },
-
-        // Surgery
-        { front: "What type of suture is Monocryl?", back: "Absorbable, monofilament.", deck: "Surgery" },
-        { front: "What is the 'golden period' for wound healing in hours?", back: "6-8 hours.", deck: "Surgery" },
-        { front: "Name the surgery used to treat Gastric Dilatation Volvulus (GDV).", back: "Gastropexy.", deck: "Surgery" },
-        { front: "What is a 'Celiaotomy' common name?", back: "Laparotomy (abdominal surgery).", deck: "Surgery" },
-        { front: "Which orthopedic procedure involves cutting the tibia to stabilize the knee?", back: "TPLO (Tibial Plateau Leveling Osteotomy).", deck: "Surgery" },
-        { front: "What is the purpose of a Penrose drain?", back: "Passive drainage of fluid from a wound.", deck: "Surgery" },
-        { front: "Define 'Asepsis'.", back: "The absence of pathogenic microorganisms in living tissue.", deck: "Surgery" },
-        { front: "What size blade is standard for most small animal surgeries?", back: "#10 or #15.", deck: "Surgery" },
-        { front: "What is the name of the permanent hole created in the trachea?", back: "Tracheostomy.", deck: "Surgery" },
-        { front: "Name a common self-retaining abdominal retractor.", back: "Balfour retractor.", deck: "Surgery" },
-
-        // Internal Medicine
-        { front: "What are the common symptoms of Hyperthyroidism in cats?", back: "Weight loss, polyphagia, tachycardia, restlessness.", deck: "Internal Medicine" },
-        { front: "Which endocrine disease is associated with' pot-bellied' appearance and alopecia?", back: "Hyperadrenocorticism (Cushing's Disease).", deck: "Internal Medicine" },
-        { front: "What is the classic 'wine glass' sign on a canine thoracic radiograph?", back: "Left atrial enlargement.", deck: "Internal Medicine" },
-        { front: "Name the primary toxin in chocolate that is dangerous to dogs.", back: "Theobromine.", deck: "Internal Medicine" },
-        { front: "What is the hallmark sign of feline lower urinary tract disease (FLUTD)?", back: "Dysuria, hematuria, pollakiuria.", deck: "Internal Medicine" },
-        { front: "Which electrolyte abnormality is life-threatening in blocked cats?", back: "Hyperkalemia.", deck: "Internal Medicine" },
-        { front: "What breed is predisposed to mitral valve disease?", back: "Cavalier King Charles Spaniel.", deck: "Internal Medicine" },
-        { front: "Define 'Parvovirus' primary target cells.", back: "Rapidly dividing cells (intestinal crypts, bone marrow).", deck: "Internal Medicine" },
-        { front: "What is the test of choice for diagnosing Exocrine Pancreatic Insufficiency (EPI)?", back: "TLI (Trypsin-like Immunoreactivity).", deck: "Internal Medicine" },
-        { front: "What does PU/PD stand for?", back: "Polyuria / Polydipsia.", deck: "Internal Medicine" }
-      ];
-
-      // Add 60 more to reach 100
-      for(let i=1; i<=60; i++) {
-        MOCK_CARDS.push({
-          front: `Quick Recall #${i}: Common clinical sign associated with system ${i % 5}?`,
-          back: `Answer ${i}: Refer to standard NAVLE protocol for specialized diagnosis.`,
-          deck: "General Science"
-        });
-      }
-
-      const batch = writeBatch(db);
-      MOCK_CARDS.forEach(card => {
-        const newRef = doc(collection(db, 'flashcards'));
-        batch.set(newRef, {
-          ...card,
-          userId: user.uid,
-          createdAt: serverTimestamp()
-        });
-      });
-
-      await batch.commit();
-      toast.success("100 Sample Flashcards generated successfully!");
-      fetchCards();
-    } catch (err) {
-      console.error("Seeding error:", err);
-      toast.error("Failed to seed database.");
-    } finally {
-      setIsSeeding(false);
-    }
+  const getWordCount = (text: string) => {
+    if (!text.trim()) return 0;
+    return text.trim().split(/\s+/).length;
   };
 
   useEffect(() => {
-    if (user) {
-      fetchCards();
-    }
-  }, [user]);
-
-  const fetchCards = async () => {
     if (!user) return;
-    setLoading(true);
-    try {
-      // Fetch all available cards to avoid complex null-filtering in Firestore
-      const snap = await getDocs(collection(db, 'flashcards'));
-      const allCardsRaw = snap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
-      
-      // Filter for system cards (no userId) and user's specific cards
-      const systemCards = allCardsRaw.filter(c => !c.userId || c.userId === 'system');
-      const userCards = allCardsRaw.filter(c => c.userId === user.uid);
 
-      const allCards = [...systemCards, ...userCards];
-      setCards(allCards);
+    const qSystem = query(collection(db, 'flashcards'), where('userId', 'in', ['system', null]));
+    const qUser = query(collection(db, 'flashcards'), where('userId', '==', user.uid));
+    
+    let systemCards: Flashcard[] = [];
+    let userCards: Flashcard[] = [];
+    
+    const updateCards = () => setCards([...systemCards, ...userCards]);
 
-      // Fetch progress for the current user
-      const progressSnap = await getDocs(collection(db, 'users', user.uid, 'flashcardProgress'));
+    const unsubSystem = onSnapshot(qSystem, (snap) => {
+      systemCards = snap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
+      updateCards();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'flashcards');
+    });
+
+    const unsubUser = onSnapshot(qUser, (snap) => {
+      userCards = snap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
+      updateCards();
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, 'flashcards');
+    });
+
+    const unsubProgress = onSnapshot(collection(db, 'users', user.uid, 'flashcardProgress'), (snap) => {
       const progressData: Record<string, FlashcardProgress> = {};
-      progressSnap.docs.forEach(d => {
+      snap.docs.forEach(d => {
         progressData[d.id] = d.data() as FlashcardProgress;
       });
       setProgress(progressData);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/flashcardProgress`);
+    });
 
-      // Filter cards for study (nextReview <= now)
-      const now = Date.now();
-      const due = allCards.filter(card => {
-        const cardProgress = progressData[card.id];
-        return !cardProgress || cardProgress.nextReview <= now;
-      });
-      setStudyQueue(due.sort(() => Math.random() - 0.5));
-    } catch (err) {
-      console.error('Error fetching cards:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+    return () => {
+      unsubSystem();
+      unsubUser();
+      unsubProgress();
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const now = Date.now();
+    const due = cards.filter(card => {
+      const cardProgress = progress[card.id];
+      return !cardProgress || cardProgress.nextReview <= now;
+    });
+    setStudyQueue(due.sort(() => Math.random() - 0.5));
+    setLoading(false);
+  }, [cards, progress]);
 
   const handleCreateCard = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!user || !newFront || !newBack) return;
+
+    if (getWordCount(newFront) > 200 || getWordCount(newBack) > 200) {
+      toast.error('Tactical limits exceeded. Content too verbose.');
+      return;
+    }
 
     try {
       await addDoc(collection(db, 'flashcards'), {
@@ -219,10 +159,10 @@ export default function Flashcards() {
       setNewFront('');
       setNewBack('');
       setNewDeck('General');
-      fetchCards();
+      toast.success('Intelligence asset deployed to library');
       setActiveTab('library');
     } catch (err) {
-      console.error('Error creating card:', err);
+      toast.error('Deployment failure');
     }
   };
 
@@ -238,173 +178,238 @@ export default function Flashcards() {
     const update: FlashcardProgress = {
       cardId: currentCard.id,
       ...nextData,
-      nextReview: nextReviewTime
+      nextReview: nextReviewTime,
+      lastReviewed: Date.now()
     };
 
     try {
-      await setDoc(doc(db, 'users', user.uid, 'flashcardProgress', currentCard.id), update);
-      setProgress(prev => ({ ...prev, [currentCard.id]: update }));
+      await firebaseService.updateFlashcardProgress(user.uid, update);
       
-      // Move to next card
       if (currentIndex < studyQueue.length - 1) {
         setIsFlipped(false);
         setCurrentIndex(prev => prev + 1);
       } else {
-        // Finished deck
         setStudyQueue([]);
         setCurrentIndex(0);
         setIsFlipped(false);
+        toast.success("Intelligence cycle completed");
       }
     } catch (err) {
-      console.error('Error updating progress:', err);
+      toast.error("Telemetry sync failed");
     }
+  };
+
+  const fetchCards = () => {
+    const now = Date.now();
+    const due = cards.filter(card => {
+      const cardProgress = progress[card.id];
+      return !cardProgress || cardProgress.nextReview <= now;
+    });
+    setStudyQueue(due.sort(() => Math.random() - 0.5));
+    setCurrentIndex(0);
+    setIsFlipped(false);
+    toast.info("Database re-indexed");
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <RotateCw className="h-8 w-8 animate-spin text-primary" />
+      <div className="flex flex-col items-center justify-center min-h-[400px] space-y-4">
+        <div className="h-12 w-12 relative">
+           <div className="absolute inset-0 rounded-full border-2 border-primary/20" />
+           <div className="absolute inset-0 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+        </div>
+        <p className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Neural Syncing...</p>
       </div>
     );
   }
 
+  const getProseSizeClass = (text: string) => {
+    if (text.length < 60) return "text-3xl font-black text-center leading-tight tracking-tight";
+    if (text.length < 150) return "text-xl font-bold text-center leading-relaxed tracking-tight";
+    return "text-base font-medium leading-relaxed";
+  };
+
   return (
-    <div className="max-w-4xl mx-auto space-y-6 pb-20">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Flashcards</h1>
-          <p className="text-muted-foreground">Master veterinary concepts with spaced repetition.</p>
+    <div className="max-w-5xl mx-auto space-y-8 pb-32 px-6">
+      {/* Header Area */}
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8 pb-8">
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-primary font-black uppercase tracking-[0.3em] text-[10px]">
+             <Brain className="h-3 w-3" strokeWidth={3} />
+             Cognitive Optimization Module
+          </div>
+          <h1 className="text-4xl md:text-6xl font-black tracking-tighter text-foreground">
+            Professional <span className="text-primary italic">Memory</span>
+          </h1>
+          <p className="text-muted-foreground font-medium text-lg">Execute spaced-repetition protocols for clinical mastery.</p>
         </div>
-        <div className="flex items-center gap-3">
-          <Badge variant="outline" className="flex items-center gap-1 py-1 px-3">
-            <Flame className="h-3 w-3 text-orange-500" />
-            <span className="font-medium">{Object.keys(progress).length} Active Cards</span>
-          </Badge>
-          <Badge variant="outline" className="flex items-center gap-1 py-1 px-3">
-            <Calendar className="h-3 w-3 text-blue-500" />
-            <span className="font-medium">{studyQueue.length} Due Today</span>
-          </Badge>
+        
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex flex-col items-center bg-muted/30 px-6 py-3 rounded-2xl border border-border/50 backdrop-blur-sm group hover:border-primary/30 transition-all">
+             <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-1">Intelligence Assets</span>
+             <div className="flex items-center gap-2">
+                <Flame className="h-4 w-4 text-orange-500" />
+                <span className="text-xl font-black">{Object.keys(progress).length}</span>
+             </div>
+          </div>
+          <div className="flex flex-col items-center bg-primary/5 px-6 py-3 rounded-2xl border border-primary/10 backdrop-blur-sm group hover:border-primary/30 transition-all">
+             <span className="text-[10px] font-black uppercase tracking-widest text-primary/60 mb-1">Due for Calibration</span>
+             <div className="flex items-center gap-2">
+                <Calendar className="h-4 w-4 text-primary" />
+                <span className="text-xl font-black text-primary">{studyQueue.length}</span>
+             </div>
+          </div>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-        <TabsList className="grid w-full grid-cols-3 mb-8">
-          <TabsTrigger value="study" className="flex items-center gap-2">
-            <Brain className="h-4 w-4" /> Study
+        <TabsList className="grid w-full grid-cols-3 h-16 p-2 bg-muted/30 backdrop-blur-md rounded-2xl mb-12 border border-border/40">
+          <TabsTrigger value="study" className="rounded-xl flex items-center justify-center gap-2 data-[state=active]:bg-card data-[state=active]:shadow-lg data-[state=active]:shadow-primary/5 transition-all text-[10px] font-black uppercase tracking-widest">
+            <Zap className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" /> Study Session
           </TabsTrigger>
-          <TabsTrigger value="library" className="flex items-center gap-2">
-            <Library className="h-4 w-4" /> Library
+          <TabsTrigger value="library" className="rounded-xl flex items-center justify-center gap-2 data-[state=active]:bg-card data-[state=active]:shadow-lg data-[state=active]:shadow-primary/5 transition-all text-[10px] font-black uppercase tracking-widest">
+            <Library className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" /> Intel Library
           </TabsTrigger>
-          <TabsTrigger value="create" className="flex items-center gap-2">
-            <Plus className="h-4 w-4" /> Create
+          <TabsTrigger value="create" className="rounded-xl flex items-center justify-center gap-2 data-[state=active]:bg-card data-[state=active]:shadow-lg data-[state=active]:shadow-primary/5 transition-all text-[10px] font-black uppercase tracking-widest">
+            <Plus className="h-4 w-4 shrink-0 transition-transform group-hover:scale-110" /> New Protocol
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="study">
-          {studyQueue.length > 0 ? (
-            <div className="space-y-8">
-              <div className="relative perspective-1000 min-h-[350px]">
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={currentIndex + (isFlipped ? '-back' : '-front')}
-                    initial={{ rotateY: isFlipped ? 90 : -90, opacity: 0 }}
-                    animate={{ rotateY: 0, opacity: 1 }}
-                    exit={{ rotateY: isFlipped ? -90 : 90, opacity: 0 }}
-                    transition={{ duration: 0.3 }}
-                    className="w-full h-full select-none"
-                    onContextMenu={(e) => e.preventDefault()}
-                    onDragStart={(e) => e.preventDefault()}
-                  >
-                    <Card 
-                      className={`w-full min-h-[350px] shadow-xl cursor-pointer hover:shadow-2xl transition-all duration-300 flex flex-col items-center justify-center p-8 text-center ${isFlipped ? 'bg-primary/5 dark:bg-primary/10' : 'bg-card'}`}
-                      onClick={() => setIsFlipped(!isFlipped)}
-                      id={`card-${studyQueue[currentIndex].id}`}
+        <TabsContent value="study" className="mt-0">
+          <AnimatePresence mode="wait">
+            {studyQueue.length > 0 ? (
+              <motion.div 
+                key="study-active"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="space-y-8"
+              >
+                <div className="relative perspective-1000 min-h-[420px]">
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={currentIndex + (isFlipped ? '-back' : '-front')}
+                      initial={{ rotateY: isFlipped ? 90 : -90, opacity: 0 }}
+                      animate={{ rotateY: 0, opacity: 1 }}
+                      exit={{ rotateY: isFlipped ? -90 : 90, opacity: 0 }}
+                      transition={{ duration: 0.4, type: "spring", stiffness: 200, damping: 25 }}
+                      className="w-full h-full select-none"
                     >
-                      <Badge className="absolute top-4 right-4">{studyQueue[currentIndex].deck || 'General'}</Badge>
-                      <div className="text-sm text-muted-foreground absolute top-4 left-4">
-                        Card {currentIndex + 1} of {studyQueue.length}
-                      </div>
+                      <Card 
+                        className={`w-full min-h-[420px] shadow-2xl rounded-[3rem] cursor-pointer hover:scale-[1.01] transition-all duration-500 flex flex-col items-center justify-center p-12 text-center relative overflow-hidden border border-border/40 ${isFlipped ? 'bg-primary border-primary shadow-primary/20' : 'bg-card'}`}
+                        onClick={() => setIsFlipped(!isFlipped)}
+                      >
+                        <div className="absolute top-10 left-10 flex items-center gap-3">
+                           <Badge variant="outline" className={`text-[9px] font-black uppercase tracking-widest px-3 py-1 border-2 ${isFlipped ? 'border-white/20 text-white/50' : 'border-primary/10 text-primary'}`}>
+                              {studyQueue[currentIndex].deck || 'General'}
+                           </Badge>
+                           <span className={`text-[9px] font-black uppercase tracking-widest ${isFlipped ? 'text-white/40' : 'text-muted-foreground/40'}`}>
+                              Asset {currentIndex + 1} / {studyQueue.length}
+                           </span>
+                        </div>
 
-                      <div className="space-y-4 max-w-lg">
-                        <p className="text-2xl font-medium leading-relaxed">
-                          {isFlipped ? studyQueue[currentIndex].back : studyQueue[currentIndex].front}
-                        </p>
-                        {!isFlipped && <p className="text-sm text-muted-foreground animate-pulse">Click to Reveal Answer</p>}
-                      </div>
-                    </Card>
-                  </motion.div>
+                        <Zap className={`absolute -right-12 -top-12 h-64 w-64 opacity-5 -rotate-12 ${isFlipped ? 'text-white' : 'text-primary'}`} />
+
+                        <div className="relative z-10 w-full max-w-2xl mx-auto space-y-6">
+                           <div className={`prose dark:prose-invert max-w-none ${isFlipped ? 'text-white' : 'text-foreground'} prose-img:rounded-3xl prose-img:max-h-64 ${getProseSizeClass(isFlipped ? studyQueue[currentIndex].back : studyQueue[currentIndex].front)}`}>
+                              <ReactMarkdown>{isFlipped ? studyQueue[currentIndex].back : studyQueue[currentIndex].front}</ReactMarkdown>
+                           </div>
+                           
+                           <AnimatePresence>
+                              {!isFlipped && (
+                                <motion.div 
+                                  initial={{ opacity: 0 }}
+                                  animate={{ opacity: 1 }}
+                                  className="flex flex-col items-center gap-4 pt-10"
+                                >
+                                   <div className="h-0.5 w-12 bg-muted rounded-full overflow-hidden">
+                                      <motion.div 
+                                        initial={{ x: "-100%" }}
+                                        animate={{ x: "100%" }}
+                                        transition={{ repeat: Infinity, duration: 2, ease: "linear" }}
+                                        className="h-full w-full bg-primary" 
+                                      />
+                                   </div>
+                                   <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.3em] opacity-40">Tap to reveal telemetry</p>
+                                </motion.div>
+                              )}
+                           </AnimatePresence>
+                        </div>
+
+                        <div className="absolute bottom-10 flex items-center gap-2 opacity-20">
+                           <Command className={`h-4 w-4 ${isFlipped ? 'text-white' : 'text-foreground'}`} />
+                           <span className={`text-[8px] font-black uppercase tracking-[0.5em] ${isFlipped ? 'text-white' : 'text-foreground'}`}>
+                              Professional Memory Engine v4.0
+                           </span>
+                        </div>
+                      </Card>
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+
+                <AnimatePresence>
+                  {isFlipped && (
+                    <motion.div 
+                      initial={{ y: 30, opacity: 0 }}
+                      animate={{ y: 0, opacity: 1 }}
+                      className="grid grid-cols-2 md:grid-cols-4 gap-4"
+                    >
+                      {[
+                        { key: 'again', label: 'Failure', time: '1m', color: 'red', detail: 'Repeat cycle' },
+                        { key: 'hard', label: 'Complex', time: '2d', color: 'orange', detail: 'Short delta' },
+                        { key: 'good', label: 'Mastered', time: '4d', color: 'green', detail: 'Normal delta' },
+                        { key: 'easy', label: 'Trivial', time: '7d', color: 'blue', detail: 'Long delta' }
+                      ].map((btn) => (
+                        <Button 
+                          key={btn.key}
+                          variant="outline" 
+                          className={`h-24 flex flex-col items-center justify-center border-2 rounded-[2rem] bg-card hover:bg-${btn.color}-500/5 hover:border-${btn.color}-500/30 transition-all group overflow-hidden relative shadow-xl shadow-muted/5`}
+                          onClick={() => handleReview(btn.key as ReviewQuality)}
+                        >
+                          <span className={`font-black uppercase tracking-widest text-[11px] mb-1 group-hover:text-${btn.color}-500 transition-colors`}>{btn.label}</span>
+                          <span className="text-[9px] font-black uppercase tracking-widest opacity-40">{btn.time} Interval</span>
+                          <div className={`absolute bottom-0 left-0 right-0 h-1 bg-${btn.color}-500/20 group-hover:h-2 transition-all`} />
+                        </Button>
+                      ))}
+                    </motion.div>
+                  )}
                 </AnimatePresence>
-              </div>
-
-              {isFlipped && (
-                <motion.div 
-                  initial={{ y: 20, opacity: 0 }}
-                  animate={{ y: 0, opacity: 1 }}
-                  className="grid grid-cols-2 md:grid-cols-4 gap-3"
-                >
-                  <Button 
-                    variant="outline" 
-                    className="h-16 flex flex-col items-center justify-center border-red-200 dark:border-red-900 hover:bg-red-50 dark:hover:bg-red-950"
-                    onClick={() => handleReview('again')}
-                  >
-                    <span className="font-bold text-red-600">Again</span>
-                    <span className="text-[10px] opacity-60">1m</span>
+              </motion.div>
+            ) : (
+              <motion.div
+                key="study-empty"
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="py-24 text-center"
+              >
+                <Card className="border-none shadow-2xl shadow-muted/5 bg-card/50 backdrop-blur-sm rounded-[3rem] p-20 flex flex-col items-center border border-border/40">
+                  <div className="h-32 w-32 rounded-[3rem] bg-emerald-500/10 flex items-center justify-center mb-10 rotate-6 border border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
+                    <CheckCircle2 className="h-12 w-12 text-emerald-500" strokeWidth={3} />
+                  </div>
+                  <h3 className="text-3xl font-black tracking-tighter mb-4">Inbox Zero Reached</h3>
+                  <p className="text-muted-foreground font-medium text-lg max-w-sm mx-auto mb-10">You've successfully recalibrated all tactical knowledge blocks scheduled for today.</p>
+                  <Button variant="outline" size="lg" onClick={fetchCards} className="h-16 px-10 rounded-2xl border-2 font-black uppercase tracking-widest text-xs hover:bg-muted/50">
+                    <RotateCw className="h-5 w-5 mr-3" /> Re-sync Database
                   </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-16 flex flex-col items-center justify-center border-orange-200 dark:border-orange-900 hover:bg-orange-50 dark:hover:bg-orange-950"
-                    onClick={() => handleReview('hard')}
-                  >
-                    <span className="font-bold text-orange-600">Hard</span>
-                    <span className="text-[10px] opacity-60">2d</span>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-16 flex flex-col items-center justify-center border-green-200 dark:border-green-900 hover:bg-green-50 dark:hover:bg-green-950"
-                    onClick={() => handleReview('good')}
-                  >
-                    <span className="font-bold text-green-600">Good</span>
-                    <span className="text-[10px] opacity-60">4d</span>
-                  </Button>
-                  <Button 
-                    variant="outline" 
-                    className="h-16 flex flex-col items-center justify-center border-blue-200 dark:border-blue-900 hover:bg-blue-50 dark:hover:bg-blue-950"
-                    onClick={() => handleReview('easy')}
-                  >
-                    <span className="font-bold text-blue-600">Easy</span>
-                    <span className="text-[10px] opacity-60">7d</span>
-                  </Button>
-                </motion.div>
-              )}
-            </div>
-          ) : (
-            <Card className="flex flex-col items-center justify-center p-12 text-center space-y-4">
-              <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center">
-                <CheckCircle2 className="h-10 w-10 text-green-600" />
-              </div>
-              <div className="space-y-2">
-                <CardTitle className="text-2xl">Deck Completed!</CardTitle>
-                <CardDescription>You've reviewed all cards due for today. Great job!</CardDescription>
-              </div>
-              <Button variant="outline" onClick={fetchCards} className="mt-4">
-                <RotateCw className="h-4 w-4 mr-2" /> Refresh Queue
-              </Button>
-            </Card>
-          )}
+                </Card>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </TabsContent>
 
-        <TabsContent value="library">
-          <div className="space-y-6">
-            <div className="relative mb-6">
-              <RotateCw className={`absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground ${loading ? 'animate-spin' : ''}`} />
-              <Input 
-                placeholder="Search by question, answer, deck or tag..." 
-                className="pl-10"
-                value={librarySearchQuery}
-                onChange={(e) => setLibrarySearchQuery(e.target.value)}
-              />
-            </div>
+        <TabsContent value="library" className="mt-0 space-y-8">
+          <div className="relative group">
+            <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+            <Input 
+              placeholder="Query protocol definitions, decks, or internal tags..." 
+              className="h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-none text-base font-medium focus-visible:ring-2 focus-visible:ring-primary/20 shadow-inner"
+              value={librarySearchQuery}
+              onChange={(e) => setLibrarySearchQuery(e.target.value)}
+            />
+            {loading && <RotateCw className="absolute right-6 top-1/2 -translate-y-1/2 h-4 w-4 animate-spin text-primary" />}
+          </div>
 
+          <div className="grid gap-12">
             {(() => {
               const filteredCards = cards.filter(card => {
                 const searchLower = librarySearchQuery.toLowerCase();
@@ -420,17 +425,18 @@ export default function Flashcards() {
 
               if (filteredCards.length === 0) {
                 return (
-                  <div className="py-20 text-center space-y-4">
-                    <AlertCircle className="h-12 w-12 text-muted-foreground mx-auto" />
-                    <p className="text-muted-foreground">No cards found matching your search.</p>
-                    <Button variant="outline" onClick={() => setLibrarySearchQuery('')}>
-                      Clear Search
+                  <div className="py-24 text-center space-y-6">
+                    <div className="h-16 w-16 bg-muted/50 rounded-2xl flex items-center justify-center mx-auto mb-4">
+                       <AlertCircle className="h-8 w-8 text-muted-foreground" />
+                    </div>
+                    <p className="text-muted-foreground font-medium">No results found in current security clearace levels.</p>
+                    <Button variant="outline" onClick={() => setLibrarySearchQuery('')} className="rounded-xl font-black text-[10px] uppercase tracking-widest">
+                      Reset Filter
                     </Button>
                   </div>
                 );
               }
 
-              // Grouping logic by Deck
               const grouped: Record<string, Flashcard[]> = {};
               filteredCards.forEach(card => {
                 const key = card.deck || 'General';
@@ -438,150 +444,137 @@ export default function Flashcards() {
                 grouped[key].push(card);
               });
 
-              // Sort decks alphabetically
-              const decks = Object.keys(grouped).sort((a, b) => a.localeCompare(b));
+              const decks = Object.keys(grouped).sort();
 
-              return (
-                <div className="space-y-10">
-                  {decks.map(deck => (
-                    <div key={deck} className="space-y-4">
-                      <div className="flex items-center gap-2 border-b pb-2">
-                        <Badge variant="default" className="bg-primary/20 text-primary hover:bg-primary/30 border-none px-3">
-                          {deck}
-                        </Badge>
-                        <span className="text-sm text-muted-foreground font-medium">
-                          {grouped[deck].length} {grouped[deck].length === 1 ? 'card' : 'cards'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {grouped[deck].map(card => {
-                          const isCurrentlyFlipped = flippedCardId === card.id;
-                          return (
-                            <Card 
-                              key={`${deck}-${card.id}`} 
-                              className={`group hover:shadow-md transition-all duration-300 border-primary/5 cursor-pointer relative overflow-hidden ${isCurrentlyFlipped ? 'ring-2 ring-primary bg-primary/5' : ''}`}
-                              onClick={() => setFlippedCardId(isCurrentlyFlipped ? null : card.id)}
-                            >
-                              <CardHeader className="pb-2">
-                                <div className="flex justify-between items-start">
-                                  <Badge variant="outline" className="text-[10px] font-mono uppercase tracking-wider">
-                                    {card.userId === user?.uid ? 'Personal' : 'System'}
-                                  </Badge>
-                                  {progress[card.id] ? (
-                                    <Badge variant="secondary" className="text-[10px] bg-green-100/50 text-green-700 dark:bg-green-900/20 dark:text-green-400">
-                                      Studied • Next: {new Date(progress[card.id].nextReview).toLocaleDateString()}
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="outline" className="text-[10px] opacity-40">Unstudied</Badge>
-                                  )}
-                                </div>
-                              </CardHeader>
-                              <CardContent className="min-h-[120px] flex flex-col justify-center">
-                                <AnimatePresence mode="wait">
-                                  <motion.div
-                                    key={isCurrentlyFlipped ? 'back' : 'front'}
-                                    initial={{ opacity: 0, y: 5 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    exit={{ opacity: 0, y: -5 }}
-                                    transition={{ duration: 0.2 }}
-                                    className="select-none"
-                                    onContextMenu={(e) => e.preventDefault()}
-                                    onDragStart={(e) => e.preventDefault()}
-                                  >
-                                    <p className={`font-medium leading-relaxed ${isCurrentlyFlipped ? 'text-primary' : ''}`}>
-                                      {isCurrentlyFlipped ? card.back : card.front}
-                                    </p>
-                                  </motion.div>
-                                </AnimatePresence>
-                              </CardContent>
-                              <CardFooter className="pt-0 flex justify-between items-center text-[10px] text-muted-foreground uppercase font-black tracking-widest opacity-40">
-                                <span>{isCurrentlyFlipped ? 'Hide Answer' : 'Click to View Answer'}</span>
-                              </CardFooter>
-                            </Card>
-                          );
-                        })}
-                      </div>
+              return decks.map(deck => (
+                <div key={deck} className="space-y-6">
+                  <div className="flex items-center justify-between pb-4 border-b border-border/50">
+                    <div className="flex items-center gap-4">
+                       <div className="h-10 w-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                          <LayoutGrid className="h-5 w-5 text-primary" />
+                       </div>
+                       <div>
+                          <h3 className="text-lg font-black tracking-tight uppercase">{deck}</h3>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{grouped[deck].length} Protocols Loaded</p>
+                       </div>
                     </div>
-                  ))}
+                  </div>
+                  
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {grouped[deck].map(card => {
+                      const isCurrentlyFlipped = flippedCardId === card.id;
+                      return (
+                        <Card 
+                          key={card.id} 
+                          className={`group hover:shadow-2xl hover:shadow-muted/10 transition-all duration-500 rounded-[2rem] border-border/40 cursor-pointer relative overflow-hidden flex flex-col p-8 ${isCurrentlyFlipped ? 'bg-primary border-primary shadow-primary/10' : 'bg-card'}`}
+                          onClick={() => setFlippedCardId(isCurrentlyFlipped ? null : card.id)}
+                        >
+                          <div className="flex justify-between items-start mb-6">
+                            <Badge variant="outline" className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 border-2 ${isCurrentlyFlipped ? 'border-white/20 text-white/60' : 'border-muted'}`}>
+                              {card.userId === user?.uid ? 'Intelligence' : 'Standard'}
+                            </Badge>
+                            {progress[card.id] ? (
+                              <div className={`flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest ${isCurrentlyFlipped ? 'text-white/60' : 'text-emerald-500'}`}>
+                                <CheckCircle2 className="h-3 w-3" /> Mastered
+                              </div>
+                            ) : (
+                              <div className={`text-[9px] font-black uppercase tracking-widest opacity-20 ${isCurrentlyFlipped ? 'text-white' : ''}`}>Unstudied</div>
+                            )}
+                          </div>
+                          
+                          <div className="flex-1 min-h-[80px] flex items-center">
+                            <div className={`prose dark:prose-invert max-w-none text-sm font-bold leading-relaxed ${isCurrentlyFlipped ? 'text-white' : 'text-foreground'}`}>
+                              <ReactMarkdown>{isCurrentlyFlipped ? card.back : card.front}</ReactMarkdown>
+                            </div>
+                          </div>
+
+                          <div className={`mt-6 pt-4 border-t border-dashed flex items-center justify-between text-[8px] font-black uppercase tracking-widest ${isCurrentlyFlipped ? 'border-white/10 text-white/40' : 'border-border/50 text-muted-foreground/30'}`}>
+                             <span>{isCurrentlyFlipped ? 'REVEALING SOLUTION' : 'SECURE DEFINITION'}</span>
+                             <span className="flex items-center gap-1">
+                                <Search className="h-2 w-2" /> View Data
+                             </span>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
                 </div>
-              );
+              ));
             })()}
           </div>
         </TabsContent>
 
-        <TabsContent value="create">
-          <Card className="border-none shadow-xl">
-            <CardHeader>
-              <CardTitle>Create Custom Flashcard</CardTitle>
-              <CardDescription>Add a new card to your personal deck for targeted study.</CardDescription>
-            </CardHeader>
-            <form onSubmit={handleCreateCard}>
-              <CardContent className="space-y-4">
-                {/* Seeding Box */}
-                <div className="p-6 rounded-[24px] bg-primary/5 border border-primary/10 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                  <div className="space-y-1">
-                    <h4 className="text-sm font-bold text-primary flex items-center gap-2">
-                       <Brain className="h-4 w-4" /> 
-                       Need sample data?
-                    </h4>
-                    <p className="text-xs text-muted-foreground">Instantly populate your library with 100 veterinary medical cards.</p>
+        <TabsContent value="create" className="mt-0">
+          <Card className="border-none shadow-2xl shadow-muted/5 bg-card/50 backdrop-blur-sm rounded-[3rem] p-12 lg:p-20 border border-border/40">
+            <div className="max-w-3xl mx-auto space-y-12">
+              <div className="space-y-4 text-center">
+                 <div className="h-20 w-20 rounded-[2.5rem] bg-primary/10 flex items-center justify-center mx-auto mb-6 rotate-12 transition-transform hover:rotate-0">
+                    <Sparkles className="h-10 w-10 text-primary" strokeWidth={3} />
+                 </div>
+                 <h2 className="text-3xl font-black tracking-tighter uppercase">Intelligence Capture</h2>
+                 <p className="text-muted-foreground font-medium text-lg">Define new cognitive protocols for personal clinical advancement.</p>
+              </div>
+
+              <form onSubmit={handleCreateCard} className="space-y-8">
+                <div className="grid md:grid-cols-2 gap-8">
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center px-1">
+                        <Label htmlFor="front" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Internal Query (Front)</Label>
+                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${getWordCount(newFront) > 200 ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground/40'}`}>
+                          {getWordCount(newFront)} / 200
+                        </span>
+                    </div>
+                    <Textarea 
+                      id="front" 
+                      placeholder="Input clinical scenario or question..." 
+                      value={newFront}
+                      onChange={(e) => setNewFront(e.target.value)}
+                      required
+                      className="min-h-[180px] rounded-3xl border-none bg-muted/20 p-8 text-base font-medium focus-visible:ring-2 focus-visible:ring-primary/20 shadow-inner resize-none appearance-none"
+                    />
                   </div>
-                  <Button 
-                    type="button"
-                    variant="secondary" 
-                    className="rounded-full bg-primary text-white hover:bg-primary/90 px-6 font-bold shadow-lg shadow-primary/20"
-                    onClick={handleSeed}
-                    disabled={isSeeding}
-                  >
-                    {isSeeding ? 'Generating...' : 'Seed Sample Library'}
-                  </Button>
+                  <div className="space-y-3">
+                    <div className="flex justify-between items-center px-1">
+                      <Label htmlFor="back" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Procedural Result (Back)</Label>
+                      <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${getWordCount(newBack) > 200 ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground/40'}`}>
+                        {getWordCount(newBack)} / 200
+                      </span>
+                    </div>
+                    <Textarea 
+                      id="back" 
+                      placeholder="Input operative standard or answer..." 
+                      value={newBack}
+                      onChange={(e) => setNewBack(e.target.value)}
+                      required
+                      className="min-h-[180px] rounded-3xl border-none bg-muted/20 p-8 text-base font-medium focus-visible:ring-2 focus-visible:ring-primary/20 shadow-inner resize-none appearance-none"
+                    />
+                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="front">Question / Front Side</Label>
-                  <Textarea 
-                    id="front" 
-                    placeholder="Enter the question or concept..." 
-                    value={newFront}
-                    onChange={(e) => setNewFront(e.target.value)}
-                    required
-                    className="min-h-[100px]"
-                  />
+                <div className="space-y-3">
+                   <Label htmlFor="deck" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground px-1">Classification Deck</Label>
+                   <div className="relative group">
+                      <LayoutGrid className="absolute left-6 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground group-focus-within:text-primary transition-colors" />
+                      <Input 
+                        id="deck" 
+                        placeholder="e.g. Neurology, Soft Tissue Surgery, Pharmacology..."
+                        value={newDeck}
+                        onChange={(e) => setNewDeck(e.target.value)}
+                        required
+                        className="h-16 pl-14 pr-6 rounded-2xl bg-muted/20 border-none text-base font-medium focus-visible:ring-2 focus-visible:ring-primary/20 shadow-inner"
+                      />
+                   </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="back">Answer / Back Side</Label>
-                  <Textarea 
-                    id="back" 
-                    placeholder="Enter the explanation or answer..." 
-                    value={newBack}
-                    onChange={(e) => setNewBack(e.target.value)}
-                    required
-                    className="min-h-[100px]"
-                  />
-                </div>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="deck">Deck / Tag</Label>
-                    <Input 
-                      id="deck" 
-                      placeholder="e.g. Anatomy, Cardiology, Surgery..."
-                      value={newDeck}
-                      onChange={(e) => setNewDeck(e.target.value)}
-                      required
-                    />
-                    <p className="text-xs text-muted-foreground">Cards will be grouped in the library by this name.</p>
-                  </div>
-                </div>
-              </CardContent>
-              <CardFooter>
-                <Button type="submit" className="w-full">
-                  <Plus className="h-4 w-4 mr-2" /> Add to Deck
+
+                <Button type="submit" className="w-full h-18 rounded-3xl text-sm font-black uppercase tracking-widest bg-primary hover:bg-primary/90 shadow-2xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                  <Plus className="h-5 w-5 mr-3" strokeWidth={3} /> Launch Intel Asset
                 </Button>
-              </CardFooter>
-            </form>
+              </form>
+            </div>
           </Card>
         </TabsContent>
       </Tabs>
     </div>
   );
 }
+

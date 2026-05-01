@@ -1,0 +1,111 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Phase 3: Primitive Definition
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isAdmin() {
+      return isSignedIn() && exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
+    // --- Entity Validation Helpers ---
+
+    function isValidUserProfile(data) {
+      return data.keys().hasAll(['uid', 'email', 'createdAt']) &&
+             data.uid == request.auth.uid &&
+             data.email is string &&
+             data.createdAt is number;
+    }
+
+    function isValidFlashcardProgress(data) {
+      return data.keys().hasAll(['cardId', 'interval', 'ease', 'nextReview', 'consecutiveCorrect']) &&
+             data.cardId is string &&
+             data.interval is number &&
+             data.ease is number &&
+             data.nextReview is number &&
+             data.consecutiveCorrect is number;
+    }
+
+    function isValidQuestion(data) {
+      return data.keys().hasAll(['question', 'options', 'correctAnswer', 'explanation', 'species', 'system']) &&
+             data.question is string &&
+             data.options is list &&
+             data.correctAnswer is int &&
+             data.explanation is string &&
+             data.species is list &&
+             data.system is string;
+    }
+
+    // --- Collection Routes ---
+
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin();
+      allow list: if isAdmin();
+      allow create: if isOwner(userId) && isValidUserProfile(incoming());
+      allow update: if (isOwner(userId) || isAdmin()) && 
+                    (isAdmin() || (incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'photoURL', 'bio', 'specialty', 'institution', 'progress', 'quizStats'])));
+
+      match /flashcardProgress/{cardId} {
+        allow read: if isOwner(userId);
+        allow write: if isOwner(userId) && isValidFlashcardProgress(incoming());
+      }
+    }
+
+    match /questions/{questionId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /flashcards/{cardId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || (isSignedIn() && incoming().userId == request.auth.uid);
+    }
+
+    match /modules/{moduleId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /pdfs/{pdfId} {
+      allow read: if isSignedIn() && (isAdmin() || resource.data.userId == request.auth.uid || !resource.data.userId);
+      allow write: if isAdmin() || (isSignedIn() && incoming().userId == request.auth.uid);
+    }
+
+    match /guidelines/{guideId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /resources/{resId} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    match /admins/{adminId} {
+      allow read: if isSignedIn();
+    }
+  }
+}

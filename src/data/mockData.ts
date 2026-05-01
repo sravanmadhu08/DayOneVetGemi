@@ -221,20 +221,23 @@ export const MOCK_RESOURCES = [
     title: 'VIN - Veterinary Information Network', 
     description: 'The largest online veterinary community for clinicians.',
     url: 'https://www.vin.com',
-    type: 'Community'
+    type: 'Community',
+    order: 1
   },
   { 
     id: 'res-2', 
     title: 'Merck Veterinary Manual', 
     description: 'Comprehensive reference for veterinary professionals.',
     url: 'https://www.merckvetmanual.com',
-    type: 'Reference'
+    type: 'Reference',
+    order: 2
   },
   { 
     id: 'res-3', 
     title: 'AVMA Resources', 
     description: 'American Veterinary Medical Association official resources.',
     url: 'https://www.avma.org',
-    type: 'Professional'
+    type: 'Professional',
+    order: 3
   },
 ];

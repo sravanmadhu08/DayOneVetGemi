@@ -77,5 +77,7 @@ export interface QuizSession {
 
 export interface GlobalSettings {
   isFreeMode: boolean;
+  speciesOptions?: string[];
+  systemOptions?: string[];
 }
 

@@ -97,7 +97,7 @@ export default function ProgressTracker() {
   if (loading) return <div className="flex justify-center items-center h-64">Analyzing progress...</div>;
 
   return (
-    <div className="space-y-8 pb-10">
+    <div className="space-y-6 pb-10">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">Performance Analytics</h1>

@@ -12,6 +12,16 @@ import { QuizSession, Question } from '@/src/types';
 import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { collection, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
 import { FileText, ExternalLink } from 'lucide-react';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function QuizDetail() {
   const navigate = useNavigate();
@@ -24,6 +34,43 @@ export default function QuizDetail() {
   const [showResult, setShowResult] = useState(false);
   const [isAborted, setIsAborted] = useState(false);
   const [sourcePdf, setSourcePdf] = useState<any | null>(null);
+  const [pendingNav, setPendingNav] = useState<string | null>(null);
+  
+  // Custom navigation blocker
+  useEffect(() => {
+    if (!session || showResult || isAborted) return;
+    
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = '';
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (anchor && anchor.href && anchor.target !== '_blank') {
+        try {
+          const url = new URL(anchor.href);
+          const isInternal = url.origin === window.location.origin && url.pathname !== '/quizzes/session';
+          if (isInternal) {
+            e.preventDefault();
+            e.stopPropagation();
+            setPendingNav(url.pathname + url.search + url.hash);
+          }
+        } catch {
+          // ignore invalid URLs
+        }
+      }
+    };
+    
+    document.addEventListener('click', handleClick, { capture: true });
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      document.removeEventListener('click', handleClick, { capture: true });
+    };
+  }, [session, showResult, isAborted]);
   
   // Timer state
   const [timeLeft, setTimeLeft] = useState<number | null>(null);
@@ -116,14 +163,23 @@ export default function QuizDetail() {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const [selections, setSelections] = useState<Record<number, number>>({});
+  const [answeredState, setAnsweredState] = useState<Record<number, boolean>>({});
+
+  useEffect(() => {
+    setSelectedOption(selections[currentStep] ?? null);
+    setIsAnswered(answeredState[currentStep] ?? false);
+  }, [currentStep]);
+
   if (!session) return <div className="flex justify-center items-center h-64">Loading session...</div>;
 
-  const currentQuestion = session.questions[currentStep];
-  const progressPercentage = ((currentStep + 1) / session.questions.length) * 100;
+  const currentQuestion = session?.questions[currentStep];
+  const progressPercentage = session ? ((currentStep + 1) / session.questions.length) * 100 : 0;
 
   const handleOptionSelect = (index: number) => {
     if (isAnswered) return;
     setSelectedOption(index);
+    setSelections(prev => ({ ...prev, [currentStep]: index }));
   };
 
   const handleConfirmAnswer = () => {
@@ -131,40 +187,51 @@ export default function QuizDetail() {
     
     // In timed exams, we don't show result immediately to simulate realistic exam
     if (session?.config.isTimed) {
-      if (selectedOption === currentQuestion.correctAnswer) {
+      if (selectedOption === currentQuestion!.correctAnswer && !answeredState[currentStep]) {
         setScore(score + 1);
       }
+      setAnsweredState(prev => ({ ...prev, [currentStep]: true }));
       handleNext();
       return;
     }
 
-    setIsAnswered(true);
-    if (selectedOption === currentQuestion.correctAnswer) {
-      setScore(score + 1);
-      toast.success("Correct!");
+    if (!answeredState[currentStep]) {
+      if (selectedOption === currentQuestion!.correctAnswer) {
+        setScore(score + 1);
+        toast.success("Correct!");
 
-      // Save correctly answered practice question
-      if (!session?.config.isTimed && user && currentQuestion.id) {
-        const completedPath = `users/${user.uid}/completedPracticeQuestions/${currentQuestion.id}`;
-        setDoc(doc(db, 'users', user.uid, 'completedPracticeQuestions', currentQuestion.id), {
-          questionId: currentQuestion.id,
-          completedAt: serverTimestamp()
-        }).catch(err => {
-          handleFirestoreError(err, OperationType.WRITE, completedPath);
-        });
+        // Save correctly answered practice question
+        if (!session?.config.isTimed && user && currentQuestion!.id) {
+          const completedPath = `users/${user.uid}/completedPracticeQuestions/${currentQuestion!.id}`;
+          setDoc(doc(db, 'users', user.uid, 'completedPracticeQuestions', currentQuestion!.id), {
+            questionId: currentQuestion!.id,
+            completedAt: serverTimestamp()
+          }).catch(err => {
+            handleFirestoreError(err, OperationType.WRITE, completedPath);
+          });
+        }
+      } else {
+        toast.error("Incorrect choice.");
       }
-    } else {
-      toast.error("Incorrect choice.");
     }
+    setIsAnswered(true);
+    setAnsweredState(prev => ({ ...prev, [currentStep]: true }));
   };
 
   const handleNext = () => {
     if (currentStep < session!.questions.length - 1) {
       setCurrentStep(currentStep + 1);
-      setSelectedOption(null);
-      setIsAnswered(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       setShowResult(true);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(currentStep - 1);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -220,13 +287,13 @@ export default function QuizDetail() {
     const incorrectCount = session.questions.length - score;
     
     return (
-      <div className="max-w-5xl mx-auto space-y-12 pt-6 pb-20 px-4">
+      <div className="max-w-5xl mx-auto space-y-8 pt-6 pb-20 px-4">
         <motion.div
           initial={{ opacity: 0, scale: 0.98 }}
           animate={{ opacity: 1, scale: 1 }}
           className="bg-background rounded-[48px] border border-border/50 shadow-2xl overflow-hidden"
         >
-          <div className="bg-muted/30 p-12 text-center border-b border-border/50 relative overflow-hidden">
+          <div className="bg-muted/30 p-8 sm:p-10 text-center border-b border-border/50 relative overflow-hidden">
             {/* Background pattern */}
             <div className="absolute inset-0 opacity-[0.03] pointer-events-none">
                <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
@@ -243,7 +310,7 @@ export default function QuizDetail() {
             </div>
           </div>
 
-          <div className="p-12 grid lg:grid-cols-12 gap-12 items-center">
+          <div className="p-6 md:p-8 lg:p-10 grid lg:grid-cols-12 gap-8 lg:gap-12 items-center">
             {/* Left: Score Gauge */}
             <div className="lg:col-span-4 flex flex-col items-center space-y-4">
               <div className="relative w-48 h-48 flex items-center justify-center">
@@ -281,48 +348,48 @@ export default function QuizDetail() {
 
             {/* Right: Metrics Matrix */}
             <div className="lg:col-span-8 grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="bg-muted/20 p-8 rounded-[32px] border border-border/50 flex flex-col justify-between h-40">
-                <div className="flex items-center gap-2 text-green-600">
+              <div className="bg-muted/20 p-6 sm:p-8 rounded-[32px] border border-border/50 flex flex-col justify-between h-auto sm:h-40 min-h-[120px]">
+                <div className="flex items-center gap-2 text-green-600 mb-2 sm:mb-0">
                   <CheckCircle2 className="h-4 w-4" />
                   <span className="text-[10px] font-black uppercase tracking-widest">Validated Correct</span>
                 </div>
                 <div>
-                  <div className="text-5xl font-black tracking-tighter">{correctCount}</div>
+                  <div className="text-4xl sm:text-5xl font-black tracking-tighter">{correctCount}</div>
                   <p className="text-xs text-muted-foreground font-medium">Cases correctly diagnosed</p>
                 </div>
               </div>
 
-              <div className="bg-muted/20 p-8 rounded-[32px] border border-border/50 flex flex-col justify-between h-40">
-                <div className="flex items-center gap-2 text-rose-600">
+              <div className="bg-muted/20 p-6 sm:p-8 rounded-[32px] border border-border/50 flex flex-col justify-between h-auto sm:h-40 min-h-[120px]">
+                <div className="flex items-center gap-2 text-rose-600 mb-2 sm:mb-0">
                   <XCircle className="h-4 w-4" />
                   <span className="text-[10px] font-black uppercase tracking-widest">Diagnostic Gaps</span>
                 </div>
                 <div>
-                  <div className="text-5xl font-black tracking-tighter">{incorrectCount}</div>
+                  <div className="text-4xl sm:text-5xl font-black tracking-tighter">{incorrectCount}</div>
                   <p className="text-xs text-muted-foreground font-medium">Opportunities for refinement</p>
                 </div>
               </div>
 
-              <div className="sm:col-span-2 bg-primary/5 p-8 rounded-[32px] border border-primary/20 flex items-center justify-between">
+              <div className="sm:col-span-2 bg-primary/5 p-6 sm:p-8 rounded-[32px] border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-0">
                 <div className="space-y-1">
                   <p className="text-[10px] font-black uppercase text-primary tracking-widest">Session Intelligence</p>
-                  <p className="font-bold text-lg leading-tight uppercase italic opacity-80">
+                  <p className="font-bold text-base sm:text-lg leading-tight uppercase italic opacity-80">
                     Calculated efficiency: {(correctCount / (session.questions.length || 1)).toFixed(2)} pts/case
                   </p>
                 </div>
-                <TrendingUp className="h-10 w-10 text-primary opacity-20" />
+                <TrendingUp className="h-8 w-8 sm:h-10 sm:w-10 text-primary opacity-20" />
               </div>
             </div>
           </div>
 
-          <div className="p-8 bg-muted/30 border-t flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="p-6 sm:p-8 bg-muted/30 border-t flex flex-col sm:flex-row gap-4 justify-center">
             <Button onClick={() => navigate('/quizzes')} variant="default" className="w-full sm:w-auto h-14 px-10 rounded-2xl text-lg font-black uppercase tracking-tight shadow-xl shadow-primary/10">Re-initiate Selection</Button>
             <Button onClick={() => navigate('/')} variant="outline" className="w-full sm:w-auto h-14 px-10 rounded-2xl text-lg font-black uppercase tracking-tight border-2">Return to Command</Button>
           </div>
         </motion.div>
 
         {/* Audit Log (Review) */}
-        <div className="space-y-8">
+        <div className="space-y-6">
           <div className="flex items-center justify-between bg-muted/30 p-6 rounded-3xl border border-border/50">
             <h3 className="font-black text-2xl uppercase italic">Diagnostic.<span className="not-italic opacity-40">LOG</span></h3>
             <Badge variant="secondary" className="px-4 py-1 rounded-full font-black text-[10px] uppercase tracking-widest">
@@ -335,7 +402,7 @@ export default function QuizDetail() {
               <Card key={idx} className="overflow-hidden border-none shadow-sm hover:shadow-xl transition-all duration-300 group rounded-[32px] bg-background border border-border/50">
                 <CardContent className="p-8 space-y-6">
                   <div className="flex gap-6">
-                    <div className="h-12 w-12 shrink-0 rounded-2xl bg-muted flex items-center justify-center font-black text-lg transition-colors group-hover:bg-primary group-hover:text-white">
+                    <div className="h-12 w-12 shrink-0 rounded-2xl bg-muted flex items-center justify-center font-black text-lg transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
                       {(idx + 1).toString().padStart(2, '0')}
                     </div>
                     <div className="space-y-6 flex-1">
@@ -373,7 +440,7 @@ export default function QuizDetail() {
   }
 
   return (
-    <div className={`max-w-4xl mx-auto space-y-12 pb-20 px-4 ${session.config.isTimed ? 'pt-16' : 'pt-8'}`}>
+    <div className={`max-w-4xl mx-auto space-y-6 pb-20 px-4 ${session.config.isTimed ? 'pt-12' : 'pt-6'}`}>
       {session.config.isTimed && (
         <div className="fixed top-0 left-0 right-0 z-[60] bg-rose-50/90 border-b border-rose-200 backdrop-blur-xl px-6 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -407,7 +474,7 @@ export default function QuizDetail() {
       )}
 
       {/* Case Header & Progress */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
           <div className="space-y-1">
             <Badge variant="outline" className={`px-3 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest ${session.config.isTimed ? 'border-rose-400 text-rose-600 bg-rose-50' : 'border-primary text-primary bg-primary/5'}`}>
@@ -456,19 +523,19 @@ export default function QuizDetail() {
           className="max-w-3xl mx-auto"
         >
           {/* Question Display */}
-          <div className="w-full space-y-8">
+          <div className="w-full space-y-4">
             <Card className="border-none shadow-2xl bg-background rounded-[32px] overflow-hidden border border-border/30">
-              <CardHeader className="bg-muted/30 p-10 border-b">
+              <CardHeader className="bg-muted/30 p-6 lg:p-8 border-b">
                 <CardTitle 
-                  className="text-2xl md:text-3xl font-bold leading-tight text-foreground/90 select-none"
+                  className="text-lg md:text-xl font-semibold leading-relaxed text-foreground select-none"
                   onContextMenu={(e) => e.preventDefault()}
                   onDragStart={(e) => e.preventDefault()}
                 >
                   {currentQuestion.question}
                 </CardTitle>
               </CardHeader>
-              <CardContent className="p-10 space-y-6">
-                <div className="grid gap-4">
+              <CardContent className="p-6 lg:p-8 space-y-6">
+                <div className="grid gap-3">
                   {currentQuestion.options.map((option, idx) => {
                     let status = "idle";
                     if (isAnswered) {
@@ -496,12 +563,12 @@ export default function QuizDetail() {
                           <div className={`h-10 w-10 rounded-2xl flex items-center justify-center font-black text-sm transition-colors ${
                             status === "correct" ? "bg-green-500 text-white" :
                             status === "incorrect" ? "bg-destructive text-white" :
-                            status === "selected" ? "bg-primary text-white" :
+                            status === "selected" ? "bg-primary text-primary-foreground" :
                             "bg-muted text-muted-foreground group-hover:bg-primary/20 group-hover:text-primary"
                           }`}>
                             {String.fromCharCode(65 + idx)}
                           </div>
-                          <span className="font-bold text-lg">{option}</span>
+                          <span className="font-semibold text-base">{option}</span>
                         </div>
                         
                         <div className="z-10">
@@ -528,7 +595,7 @@ export default function QuizDetail() {
                       className="mt-8 overflow-hidden"
                     >
                       <div className="p-8 rounded-[32px] bg-primary/5 border border-primary/20 relative">
-                         <div className="absolute -top-3 left-8 px-3 bg-primary text-white text-[10px] font-black uppercase tracking-widest rounded-full">
+                         <div className="absolute -top-3 left-8 px-3 bg-primary text-primary-foreground text-[10px] font-black uppercase tracking-widest rounded-full">
                            Pathophysiology Explanation
                          </div>
                          <p className="text-base text-foreground/80 leading-relaxed italic">
@@ -571,22 +638,33 @@ export default function QuizDetail() {
                   )}
                 </AnimatePresence>
               </CardContent>
-              <CardFooter className="p-10 pt-0 flex justify-between gap-4">
-                <Button 
-                  variant="ghost"
-                  size="lg"
-                  className="h-16 px-10 rounded-2xl text-lg font-bold text-muted-foreground hover:bg-muted/50 uppercase tracking-tight"
-                  onClick={handleNext}
-                  disabled={isAnswered}
-                >
-                  Skip Case
-                </Button>
+              <CardFooter className="p-6 lg:p-8 pt-0 flex flex-col sm:flex-row justify-between gap-4">
+                <div className="flex gap-2">
+                  <Button 
+                    variant="ghost"
+                    size="lg"
+                    className="h-14 px-6 rounded-2xl text-lg font-bold text-muted-foreground hover:bg-muted/50 uppercase tracking-tight"
+                    onClick={handlePrevious}
+                    disabled={currentStep === 0 || isAnswered}
+                  >
+                    Previous
+                  </Button>
+                  <Button 
+                    variant="ghost"
+                    size="lg"
+                    className="h-14 px-6 rounded-2xl text-lg font-bold text-muted-foreground hover:bg-muted/50 uppercase tracking-tight"
+                    onClick={handleNext}
+                    disabled={isAnswered}
+                  >
+                    Skip Case
+                  </Button>
+                </div>
 
                 <div className="flex gap-4">
                   {!isAnswered && !session.config.isTimed ? (
                     <Button 
                       size="lg" 
-                      className="h-16 px-10 rounded-2xl text-lg font-black bg-primary shadow-xl shadow-primary/20 uppercase tracking-tight" 
+                      className="h-14 px-8 rounded-2xl text-base font-black bg-primary shadow-xl shadow-primary/20 uppercase tracking-tight" 
                       onClick={handleConfirmAnswer} 
                       disabled={selectedOption === null}
                     >
@@ -595,21 +673,21 @@ export default function QuizDetail() {
                   ) : session.config.isTimed ? (
                     <Button 
                       size="lg" 
-                      className="h-16 px-10 rounded-2xl text-lg font-black bg-rose-600 hover:bg-rose-700 shadow-xl shadow-rose-600/20 uppercase tracking-tight flex items-center group" 
+                      className="h-14 px-8 rounded-2xl text-base font-black bg-rose-600 hover:bg-rose-700 shadow-xl shadow-rose-600/20 uppercase tracking-tight flex items-center group" 
                       onClick={handleConfirmAnswer} 
                       disabled={selectedOption === null}
                     >
                       {currentStep < session.questions.length - 1 ? 'Commit Answer' : 'Submit Final Script'}
-                      <ChevronRight className="ml-2 h-6 w-6 group-hover:translate-x-2 transition-transform" />
+                      <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-2 transition-transform" />
                     </Button>
                   ) : (
                     <Button 
                       size="lg" 
-                      className="h-16 px-10 rounded-2xl text-lg font-black bg-foreground text-background shadow-xl uppercase tracking-tight flex items-center group" 
+                      className="h-14 px-8 rounded-2xl text-base font-black bg-foreground text-background shadow-xl uppercase tracking-tight flex items-center group" 
                       onClick={handleNext}
                     >
                       {currentStep < session.questions.length - 1 ? 'Next Case' : 'Finalize Session'}
-                      <ChevronRight className="ml-2 h-6 w-6 group-hover:translate-x-2 transition-transform" />
+                      <ChevronRight className="ml-2 h-5 w-5 group-hover:translate-x-2 transition-transform" />
                     </Button>
                   )}
                 </div>
@@ -618,6 +696,30 @@ export default function QuizDetail() {
           </div>
         </motion.div>
       </AnimatePresence>
+      
+      <AlertDialog open={!!pendingNav} onOpenChange={(open) => !open && setPendingNav(null)}>
+        <AlertDialogContent className="rounded-[32px] sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl font-black">Quit Exam?</AlertDialogTitle>
+            <AlertDialogDescription className="text-muted-foreground font-medium">
+              You are navigating away from an active exam. Your progress may be lost. Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:items-center sm:justify-between flex-row gap-2">
+            <AlertDialogCancel className="mt-0 h-12 flex-1 rounded-2xl font-bold border-2">Cancel</AlertDialogCancel>
+            <AlertDialogAction 
+              className="h-12 flex-1 rounded-2xl font-bold bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={() => {
+                if (pendingNav) {
+                   window.location.href = pendingNav;
+                }
+              }}
+            >
+              Quit Exam
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

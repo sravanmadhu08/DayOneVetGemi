@@ -1,21 +1,26 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/src/hooks/useAuth';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { 
-  LogOut, 
-  Calendar, 
-  Mail, 
-  Shield, 
+import { useState } from "react";
+import { useAuth } from "@/src/hooks/useAuth";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  CardDescription,
+} from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import {
+  LogOut,
+  Mail,
+  Shield,
   ShieldCheck,
-  Edit2, 
-  Save, 
-  X, 
+  Edit2,
+  Save,
+  X,
   User as UserIcon,
   Briefcase,
   GraduationCap,
@@ -24,26 +29,38 @@ import {
   Flame,
   TrendingUp,
   Settings,
-  BookOpen
-} from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Link } from 'react-router-dom';
-import { toast } from 'sonner';
+  Settings2,
+  BookOpen,
+  LayoutGrid,
+} from "lucide-react";
+import { motion } from "framer-motion";
+import { Link } from "react-router-dom";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 export default function Profile() {
-  const { profile, logout, updateProfile, promoteToAdmin, promoteOtherToAdmin, user, globalSettings, updateGlobalSettings } = useAuth();
+  const {
+    profile,
+    logout,
+    updateProfile,
+    promoteToAdmin,
+    promoteOtherToAdmin,
+    user,
+    globalSettings,
+    updateGlobalSettings,
+  } = useAuth();
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
-    displayName: profile?.displayName || '',
-    bio: profile?.bio || '',
-    specialty: profile?.specialty || '',
-    institution: profile?.institution || ''
+    displayName: profile?.displayName || "",
+    bio: profile?.bio || "",
+    specialty: profile?.specialty || "",
+    institution: profile?.institution || "",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isPromoting, setIsPromoting] = useState(false);
-  
+
   // Super admin state
-  const [targetUid, setTargetUid] = useState('');
+  const [targetUid, setTargetUid] = useState("");
   const [isPromotingOther, setIsPromotingOther] = useState(false);
 
   const handleSave = async () => {
@@ -51,9 +68,9 @@ export default function Profile() {
     try {
       await updateProfile(formData);
       setIsEditing(false);
-      toast.success('Profile updated successfully');
+      toast.success("Identity updated successfully");
     } catch (error) {
-      toast.error('Failed to update profile');
+      toast.error("Access denied. Synchronisation failure.");
     } finally {
       setIsSaving(false);
     }
@@ -63,23 +80,23 @@ export default function Profile() {
     setIsPromoting(true);
     try {
       await promoteToAdmin();
-      toast.success('You are now an administrator!');
+      toast.success("Privilege escalation successful");
     } catch (error) {
-      toast.error('Promotion failed. Check console for details.');
+      toast.error("Promotion protocol rejected");
     } finally {
       setIsPromoting(false);
     }
   };
 
   const handlePromoteOther = async () => {
-    if(!targetUid) return;
+    if (!targetUid) return;
     setIsPromotingOther(true);
     try {
       await promoteOtherToAdmin(targetUid);
-      toast.success('User promoted to admin successfully!');
-      setTargetUid('');
+      toast.success("Remote user promoted successfully");
+      setTargetUid("");
     } catch (error) {
-      toast.error('Failed to promote user.');
+      toast.error("Execution failure");
     } finally {
       setIsPromotingOther(false);
     }
@@ -88,297 +105,299 @@ export default function Profile() {
   const completedModules = Object.keys(profile?.progress || {}).length;
 
   return (
-    <div className="max-w-3xl mx-auto space-y-8 pb-20">
-      <div className="flex justify-between items-end">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Your Profile</h1>
-          <p className="text-muted-foreground">Manage your veterinary professional identity.</p>
+    <div className="max-w-7xl mx-auto space-y-12 pb-20">
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
+        <div className="space-y-4">
+           <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50">
+             User Management Layer
+           </div>
+           <h1 className="text-4xl md:text-5xl font-black tracking-tighter">Your Platform Profile</h1>
         </div>
+        
         {!isEditing ? (
-          <Button onClick={() => setIsEditing(true)} variant="outline" size="sm">
-            <Edit2 className="h-4 w-4 mr-2" /> Edit Profile
+          <Button
+            onClick={() => setIsEditing(true)}
+            className="rounded-2xl h-12 px-8 font-black uppercase tracking-widest text-[10px] shadow-lg shadow-primary/20"
+          >
+            <Edit2 className="h-4 w-4 mr-2" strokeWidth={3} /> Modify Identity
           </Button>
         ) : (
           <div className="flex gap-2">
-            <Button onClick={() => setIsEditing(false)} variant="ghost" size="sm">
-              <X className="h-4 w-4 mr-2" /> Cancel
+            <Button
+              onClick={() => setIsEditing(false)}
+              variant="outline"
+              className="rounded-2xl h-12 px-6 font-bold border-2"
+            >
+              <X className="h-4 w-4 mr-2 text-destructive" /> Cancel
             </Button>
-            <Button onClick={handleSave} size="sm" disabled={isSaving}>
-              {isSaving ? <span className="animate-spin mr-2">...</span> : <Save className="h-4 w-4 mr-2" />}
-              Save Changes
+            <Button onClick={handleSave} className="rounded-2xl h-12 px-8 font-black uppercase tracking-widest text-[10px]" disabled={isSaving}>
+              {isSaving ? "Syncing..." : "Commit Changes"}
             </Button>
           </div>
         )}
       </div>
-      
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-      >
-        <Card className="overflow-hidden border-primary/10 shadow-lg">
-          <div className="h-40 bg-gradient-to-r from-primary/10 via-primary/5 to-transparent w-full" />
-          <CardHeader className="relative pb-0 px-8">
-            <div className="absolute -top-16 left-8">
-              <Avatar className="h-32 w-32 border-4 border-background shadow-xl">
-                <AvatarImage src={profile?.photoURL || ''} />
-                <AvatarFallback className="text-4xl bg-primary/10">{profile?.displayName?.[0] || 'V'}</AvatarFallback>
-              </Avatar>
-            </div>
-            <div className="pt-20 pb-4 space-y-1">
-              {isEditing ? (
-                <div className="space-y-2 max-w-md">
-                  <Label htmlFor="displayName">Display Name</Label>
-                  <Input 
-                    id="displayName"
-                    value={formData.displayName}
-                    onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
-                    className="text-xl font-bold"
-                  />
-                </div>
-              ) : (
-                <>
-                  <CardTitle className="text-3xl font-extrabold">{profile?.displayName}</CardTitle>
-                  <CardDescription className="flex items-center text-base">
-                    <Mail className="h-4 w-4 mr-2" /> {profile?.email}
-                  </CardDescription>
-                </>
-              )}
-            </div>
-          </CardHeader>
 
-          <CardContent className="px-8 py-8 space-y-8">
-            <div className="grid gap-6 md:grid-cols-2">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground flex items-center gap-2">
-                    <Briefcase className="h-4 w-4" /> Specialty
-                  </Label>
-                  {isEditing ? (
-                    <Input 
-                      placeholder="e.g. Small Animal Surgery"
-                      value={formData.specialty}
-                      onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
-                    />
-                  ) : (
-                    <p className="font-medium text-lg">{profile?.specialty || 'Not specified'}</p>
-                  )}
+      <div className="grid lg:grid-cols-12 gap-8">
+        <motion.div
+           initial={{ opacity: 0, x: -20 }}
+           animate={{ opacity: 1, x: 0 }}
+           className="lg:col-span-8 space-y-8"
+        >
+          <Card className="rounded-[2.5rem] border-none shadow-2xl shadow-primary/5 overflow-hidden">
+             <div className="h-48 bg-muted/20 relative overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent" />
+                <div className="absolute top-0 right-0 p-8">
+                   <Badge variant="outline" className="bg-white/50 backdrop-blur-md border-primary/20 text-primary font-black uppercase tracking-[0.2em] text-[8px] py-1 px-3">
+                      Clinician Certified
+                   </Badge>
                 </div>
+             </div>
+             <CardHeader className="relative px-10 pb-0 flex flex-col items-center sm:flex-row sm:items-end gap-8 -mt-16">
+                <Avatar className="h-40 w-40 rounded-[2.5rem] border-8 border-background shadow-2xl">
+                  <AvatarImage src={profile?.photoURL || ""} className="object-cover" />
+                  <AvatarFallback className="text-5xl font-black bg-primary/10 text-primary">
+                    {profile?.displayName?.[0] || "V"}
+                  </AvatarFallback>
+                </Avatar>
+                
+                <div className="space-y-1 pb-4 text-center sm:text-left">
+                   {isEditing ? (
+                     <div className="space-y-2">
+                       <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1">Display Descriptor</Label>
+                       <Input
+                         value={formData.displayName}
+                         onChange={(e) => setFormData({ ...formData, displayName: e.target.value })}
+                         className="text-2xl font-black h-12 px-4 rounded-xl border-none bg-muted/30 focus:bg-muted/50"
+                       />
+                     </div>
+                   ) : (
+                     <>
+                        <h2 className="text-4xl font-black tracking-tight">{profile?.displayName}</h2>
+                        <div className="flex items-center gap-2 text-muted-foreground font-medium text-sm">
+                           <Mail className="h-3.5 w-3.5" /> {profile?.email}
+                        </div>
+                     </>
+                   )}
+                </div>
+             </CardHeader>
 
-                <div className="space-y-2">
-                  <Label className="text-muted-foreground flex items-center gap-2">
-                    <GraduationCap className="h-4 w-4" /> Institution
-                  </Label>
-                  {isEditing ? (
-                    <Input 
-                      placeholder="e.g. Royal Veterinary College"
-                      value={formData.institution}
-                      onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
-                    />
-                  ) : (
-                    <p className="font-medium text-lg">{profile?.institution || 'Not specified'}</p>
-                  )}
-                </div>
-              </div>
+             <CardContent className="p-10 space-y-10">
+                <div className="grid md:grid-cols-2 gap-10">
+                   <div className="space-y-6">
+                      <div className="space-y-2">
+                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 flex items-center gap-2">
+                            <Briefcase className="h-3 w-3" /> Professional Specialty
+                         </Label>
+                         {isEditing ? (
+                           <Input
+                             value={formData.specialty}
+                             onChange={(e) => setFormData({ ...formData, specialty: e.target.value })}
+                             className="rounded-xl h-11 border-none bg-muted/20 font-bold"
+                             placeholder="e.g. Feline Internal Medicine"
+                           />
+                         ) : (
+                           <p className="text-lg font-black text-foreground/80">{profile?.specialty || "Not Defined"}</p>
+                         )}
+                      </div>
 
-              <div className="space-y-2">
-                <Label className="text-muted-foreground flex items-center gap-2">
-                  <UserIcon className="h-4 w-4" /> Bio
-                </Label>
-                {isEditing ? (
-                  <Textarea 
-                    placeholder="Tell us about your background and interests..."
-                    className="min-h-[120px]"
-                    value={formData.bio}
-                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
-                  />
-                ) : (
-                  <p className="text-muted-foreground italic leading-relaxed">
-                    {profile?.bio || 'You haven\'t added a bio yet. Click edit to tell the community about yourself.'}
-                  </p>
-                )}
-              </div>
-            </div>
+                      <div className="space-y-2">
+                         <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 flex items-center gap-2">
+                            <GraduationCap className="h-3 w-3" /> Clinical Institution
+                         </Label>
+                         {isEditing ? (
+                           <Input
+                             value={formData.institution}
+                             onChange={(e) => setFormData({ ...formData, institution: e.target.value })}
+                             className="rounded-xl h-11 border-none bg-muted/20 font-bold"
+                             placeholder="e.g. Royal College of Veterinary"
+                           />
+                         ) : (
+                           <p className="text-lg font-black text-foreground/80">{profile?.institution || "Independent"}</p>
+                         )}
+                      </div>
+                   </div>
 
-            <div className="pt-8 border-t">
-              <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-                <Trophy className="h-5 w-5 text-yellow-500" /> Professional Progress
-              </h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="p-4 rounded-xl bg-muted/30 border flex flex-col items-center text-center">
-                  <Target className="h-5 w-5 text-blue-500 mb-1" />
-                  <span className="text-2xl font-bold">{profile?.quizStats?.completed || 0}</span>
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Quizzes</span>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/30 border flex flex-col items-center text-center">
-                  <Flame className="h-5 w-5 text-orange-500 mb-1" />
-                  <span className="text-2xl font-bold">{completedModules}</span>
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Modules</span>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/30 border flex flex-col items-center text-center">
-                  <TrendingUp className="h-5 w-5 text-green-500 mb-1" />
-                  <span className="text-2xl font-bold">{profile?.quizStats?.averageScore || 0}%</span>
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Avg Score</span>
-                </div>
-                <div className="p-4 rounded-xl bg-muted/30 border flex flex-col items-center text-center">
-                  <Calendar className="h-5 w-5 text-purple-500 mb-1" />
-                  <span className="text-2xl font-bold">{new Date(profile?.createdAt || 0).getFullYear()}</span>
-                  <span className="text-xs text-muted-foreground uppercase tracking-wider">Joined</span>
-                </div>
-              </div>
-            </div>
-            
-            {!profile?.isAdmin && !globalSettings?.isFreeMode && (
-              <div className="pt-8 border-t">
-                <Card className="bg-primary/5 border-primary/20">
-                  <CardContent className="p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div>
-                      <h4 className="font-bold text-lg">Subscription Details</h4>
-                      {profile?.subscriptionUntil && profile.subscriptionUntil > Date.now() ? (
-                        <p className="text-sm text-muted-foreground">Active until {new Date(profile.subscriptionUntil).toLocaleDateString()} on the {profile.subscriptionPlan} plan.</p>
+                   <div className="space-y-2">
+                      <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1 flex items-center gap-2">
+                         <UserIcon className="h-3 w-3" /> Clinical Narrative
+                      </Label>
+                      {isEditing ? (
+                        <Textarea
+                          value={formData.bio}
+                          onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                          className="min-h-[120px] rounded-2xl border-none bg-muted/20 font-medium text-sm leading-relaxed"
+                          placeholder="Your professional background..."
+                        />
                       ) : (
-                        <p className="text-sm text-destructive font-medium">Your subscription has expired or is missing.</p>
+                        <p className="text-sm font-medium text-muted-foreground leading-relaxed italic">
+                           {profile?.bio || "No narrative established for this clinician identifier."}
+                        </p>
                       )}
-                    </div>
-                    <Link to="/subscribe">
-                      <Button variant="default" className="whitespace-nowrap">Manage Subscription</Button>
-                    </Link>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
-            
-            <div className="pt-8 flex flex-col sm:flex-row gap-4 border-t">
-              <Button variant="outline" onClick={logout} className="text-destructive hover:bg-destructive/10 hover:text-destructive rounded-xl">
-                <LogOut className="mr-2 h-4 w-4" /> Sign Out
-              </Button>
-              
-              {(!profile?.isAdmin && user?.email === 'sravan96mufc@gmail.com') ? (
-                <Button variant="ghost" onClick={handlePromote} disabled={isPromoting} className="rounded-xl text-primary hover:bg-primary/5">
-                   <ShieldCheck className="h-4 w-4 mr-2" /> 
-                   {isPromoting ? 'Promoting...' : 'Promote Self to Admin'}
-                </Button>
-              ) : null}
+                   </div>
+                </div>
 
-              <div className="text-xs text-muted-foreground flex items-center sm:ml-auto mt-4 sm:mt-0">
-                <Shield className="h-3 w-3 mr-1" /> Profile security managed by Vetica.
-              </div>
-            </div>
-
-            {(profile?.isAdmin || user?.email === 'sravan96mufc@gmail.com') && (
-              <div className="pt-8 border-t space-y-6">
-                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                   <div>
-                     <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 text-primary mb-1">
-                        <Settings className="h-5 w-5" /> Admin Control Panel
-                     </h4>
-                     <p className="text-sm text-muted-foreground">Manage platform content and databases.</p>
+                <div className="pt-10 border-t border-border/50">
+                   <div className="flex items-center justify-between mb-8">
+                      <h3 className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2">
+                         <Trophy className="h-4 w-4 text-amber-500" /> Operational Metrics
+                      </h3>
+                      <Link to="/progress" className="text-[10px] font-black uppercase tracking-widest text-primary hover:underline">Full Analytics Repo</Link>
                    </div>
                    
-                   <div className="flex items-center space-x-3 bg-muted/50 p-3 rounded-lg border">
-                     <Label htmlFor="free-mode" className="font-bold cursor-pointer">App Free Mode</Label>
-                     <Switch 
-                        id="free-mode" 
-                        checked={globalSettings?.isFreeMode ?? true} 
-                        onCheckedChange={(val) => updateGlobalSettings({ isFreeMode: val })}
-                     />
+                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { label: "Quizzes", val: profile?.quizStats?.completed || 0, icon: Target, color: "text-blue-500" },
+                        { label: "Modules", val: completedModules, icon: Flame, color: "text-orange-500" },
+                        { label: "Accuracy", val: `${profile?.quizStats?.averageScore || 0}%`, icon: TrendingUp, color: "text-emerald-500" },
+                        { label: "Cycle 1", val: new Date(profile?.createdAt || 0).getFullYear(), icon: LayoutGrid, color: "text-purple-500" },
+                      ].map((stat, i) => (
+                        <div key={i} className="p-6 rounded-3xl bg-muted/10 border border-border/30 flex flex-col items-center text-center group hover:bg-muted/30 transition-all">
+                           <stat.icon className={`h-5 w-5 mb-3 ${stat.color} group-hover:scale-110 transition-transform`} />
+                           <span className="text-2xl font-black tracking-tight">{stat.val}</span>
+                           <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mt-1">{stat.label}</span>
+                        </div>
+                      ))}
                    </div>
-                 </div>
-                 
-                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2"><Target className="h-4 w-4 text-primary" /> Questions</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Questions upload initiated')}>
-                          Bulk Upload CSV
-                        </Button>
-                      </CardContent>
-                    </Card>
+                </div>
+             </CardContent>
+          </Card>
+        </motion.div>
 
-                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2"><Flame className="h-4 w-4 text-primary" /> Modules</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Module creator opened')}>
-                          Add Module
-                        </Button>
-                      </CardContent>
-                    </Card>
+        <motion.div
+           initial={{ opacity: 0, x: 20 }}
+           animate={{ opacity: 1, x: 0 }}
+           className="lg:col-span-4 space-y-6"
+        >
+          {/* Admin Command Center */}
+          {(profile?.isAdmin || user?.email === "sravan96mufc@gmail.com") && (
+             <Card className="rounded-[2.5rem] bg-foreground text-background shadow-2xl p-8 overflow-hidden relative group">
+                <div className="relative z-10 space-y-6">
+                   <div className="flex items-center justify-between">
+                      <h3 className="text-sm font-black uppercase tracking-[0.2em] flex items-center gap-2 text-primary">
+                         <ShieldCheck className="h-5 w-5" /> Admin Control
+                      </h3>
+                      <div className="flex items-center gap-2 bg-white/10 px-3 py-1 rounded-full">
+                         <span className="text-[8px] font-black uppercase">Free Mode</span>
+                         <Switch
+                           checked={globalSettings?.isFreeMode ?? true}
+                           onCheckedChange={(val) => updateGlobalSettings({ isFreeMode: val })}
+                           className="data-[state=checked]:bg-primary h-4 w-7 slide-in-from-left-0"
+                         />
+                      </div>
+                   </div>
 
-                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2"><Briefcase className="h-4 w-4 text-primary" /> Flashcards</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Flashcard upload initiated')}>
-                          Add Flashcards
-                        </Button>
-                      </CardContent>
-                    </Card>
+                   <div className="grid gap-3">
+                      {[
+                        { label: "Question Lab", path: "/admin/questions", icon: Target },
+                        { label: "Module Engine", path: "/admin/modules", icon: Settings2 },
+                        { label: "System Config", path: "/admin/settings", icon: LayoutGrid },
+                      ].map((link, i) => (
+                        <Link key={i} to={link.path}>
+                           <Button variant="ghost" className="w-full justify-between h-12 px-4 rounded-xl bg-white/5 hover:bg-white/10 text-white border-transparent transition-all group/btn">
+                              <div className="flex items-center gap-3">
+                                 <link.icon className="h-4 w-4 text-primary" />
+                                 <span className="text-xs font-black uppercase tracking-widest">{link.label}</span>
+                              </div>
+                              <ArrowRight className="h-3 w-3 opacity-30 group-hover/btn:translate-x-1 group-hover/btn:opacity-100 transition-all" />
+                           </Button>
+                        </Link>
+                      ))}
+                   </div>
+                </div>
+                <Settings className="absolute -right-12 -bottom-12 h-40 w-40 opacity-5 -rotate-12 group-hover:rotate-0 transition-transform duration-700" />
+             </Card>
+          )}
 
-                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2"><BookOpen className="h-4 w-4 text-primary" /> PDF Resources</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('PDF upload initiated')}>
-                          Upload PDFs
-                        </Button>
-                      </CardContent>
-                    </Card>
+          {/* Security & System */}
+          <Card className="rounded-[2.5rem] border border-border/40 p-8 space-y-8 shadow-sm">
+             <div className="space-y-4">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] flex items-center gap-2 text-muted-foreground">
+                   <Shield className="h-3 w-3" /> Access Protocol
+                </h3>
+                <div className="p-5 rounded-[2rem] bg-muted/20 border border-border/50 space-y-4">
+                   <div className="space-y-1">
+                      <Label className="text-[8px] font-black uppercase opacity-40">Encryption Provider</Label>
+                      <p className="text-xs font-black uppercase tracking-widest text-foreground/70">
+                         {user?.providerData[0]?.providerId === 'password' ? 'Cipher Layer: Private' : 'OAuth: Nexus Sync'}
+                      </p>
+                   </div>
+                   <div className="h-px bg-border/50" />
+                   <div className="space-y-2">
+                      <Label className="text-[8px] font-black uppercase opacity-40">Operational Identifier</Label>
+                      <p className="text-[9px] font-mono font-bold break-all opacity-60 leading-none">{user?.uid}</p>
+                   </div>
+                </div>
+             </div>
 
-                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2"><GraduationCap className="h-4 w-4 text-primary" /> Guidelines</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Guidelines editor opened')}>
-                          Add Guidelines
-                        </Button>
-                      </CardContent>
-                    </Card>
+             <div className="space-y-4">
+                <Button 
+                   variant="outline" 
+                   onClick={logout}
+                   className="w-full h-14 rounded-2xl border-destructive/20 text-destructive hover:bg-destructive shadow-lg shadow-destructive/5 hover:text-white font-black uppercase tracking-widest text-[10px] transition-all"
+                >
+                   <LogOut className="h-4 w-4 mr-2" /> De-authorize Session
+                </Button>
+                
+                {!profile?.isAdmin && user?.email === "sravan96mufc@gmail.com" && (
+                   <Button
+                      variant="ghost"
+                      onClick={handlePromote}
+                      disabled={isPromoting}
+                      className="w-full h-12 rounded-2xl text-primary hover:bg-primary/5 font-black uppercase tracking-widest text-[10px]"
+                   >
+                      <ShieldCheck className="h-4 w-4 mr-2" />
+                      {isPromoting ? "Escalating..." : "Elevate to Admin"}
+                   </Button>
+                )}
+             </div>
+          </Card>
 
-                    <Card className="hover:border-primary/50 transition-colors bg-muted/20">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm flex items-center gap-2"><LogOut className="h-4 w-4 text-primary" /> Databases</CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Button variant="secondary" className="w-full text-xs" onClick={() => toast.success('Database connector opened')}>
-                          Other Databases
-                        </Button>
-                      </CardContent>
-                    </Card>
-                 </div>
-              </div>
-            )}
-
-            {user?.email === 'sravan96mufc@gmail.com' && (
-              <div className="pt-8 border-t space-y-4">
-                 <h4 className="font-black text-sm uppercase tracking-widest flex items-center gap-2 text-primary">
-                    <ShieldCheck className="h-4 w-4" /> Super Admin Center
-                 </h4>
-                 <div className="flex flex-col sm:flex-row gap-2">
-                    <Input 
-                      placeholder="Enter User UID to promote" 
-                      value={targetUid} 
-                      onChange={e => setTargetUid(e.target.value)} 
-                      className="rounded-xl flex-1 h-12 text-sm"
-                    />
-                    <Button 
-                      onClick={handlePromoteOther} 
-                      disabled={isPromotingOther || !targetUid} 
-                      className="rounded-xl h-12 px-8 font-black uppercase text-xs tracking-widest bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
-                    >
-                       Promote User
-                    </Button>
-                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </motion.div>
+          {/* Super Admin Center */}
+          {user?.email === "sravan96mufc@gmail.com" && (
+             <motion.div
+               initial={{ opacity: 0, y: 10 }}
+               animate={{ opacity: 1, y: 0 }}
+               className="p-6 rounded-[2rem] bg-muted/20 border border-dashed border-primary/30 space-y-4"
+             >
+                <h4 className="text-[10px] font-black uppercase tracking-widest flex items-center gap-2 text-primary">
+                  <ShieldCheck className="h-4 w-4" /> Root Authority
+                </h4>
+                <div className="flex flex-col gap-2">
+                  <Input
+                    placeholder="Remote UID..."
+                    value={targetUid}
+                    onChange={(e) => setTargetUid(e.target.value)}
+                    className="rounded-xl h-10 text-xs font-mono bg-white border-transparent"
+                  />
+                  <Button
+                    onClick={handlePromoteOther}
+                    disabled={isPromotingOther || !targetUid}
+                    size="sm"
+                    className="rounded-xl font-black uppercase text-[9px] tracking-widest"
+                  >
+                    Remote Promotion
+                  </Button>
+                </div>
+             </motion.div>
+          )}
+        </motion.div>
+      </div>
     </div>
   );
 }
+
+const ArrowRight = ({ className, strokeWidth }: any) => (
+  <svg 
+    xmlns="http://www.w3.org/2000/svg" 
+    viewBox="0 0 24 24" 
+    fill="none" 
+    stroke="currentColor" 
+    strokeWidth={strokeWidth || "2"} 
+    strokeLinecap="round" 
+    strokeLinejoin="round" 
+    className={className}
+  >
+    <path d="M5 12h14M12 5l7 7-7 7"/>
+  </svg>
+)
+

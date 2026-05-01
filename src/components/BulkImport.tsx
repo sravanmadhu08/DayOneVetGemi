@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import mammoth from 'mammoth';
+import { motion, AnimatePresence } from 'motion/react';
 import { parseQuestionsFromText } from '../services/geminiService';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
@@ -7,7 +8,7 @@ import { useAuth } from '../hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2 } from 'lucide-react';
+import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Sparkles, Database, Command, FileUp } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
@@ -36,6 +37,7 @@ export function BulkImport() {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files[0]) {
       setFile(e.target.files[0]);
+      toast.info(`Asset staged: ${e.target.files[0].name}`);
     }
   };
 
@@ -43,7 +45,7 @@ export function BulkImport() {
     if (!file || !user) return;
 
     setLoading(true);
-    setStatus('Extracting text from document...');
+    setStatus('Extracting telemetry from document...');
     setProgress(20);
 
     try {
@@ -51,12 +53,12 @@ export function BulkImport() {
       const result = await mammoth.extractRawText({ arrayBuffer });
       const text = result.value;
 
-      setStatus('Gemini is analyzing and structuring questions...');
+      setStatus('Neural Engine is structuring datasets...');
       setProgress(50);
       
       const questions = await parseQuestionsFromText(text);
       
-      setStatus(`Importing ${questions.length} questions to your library...`);
+      setStatus(`Importing ${questions.length} tactical units to library...`);
       setProgress(80);
 
       const batch = writeBatch(db);
@@ -75,106 +77,138 @@ export function BulkImport() {
       await batch.commit().catch(err => handleFirestoreError(err, OperationType.WRITE, path));
 
       setProgress(100);
-      setStatus('Success! Questions added.');
-      toast.success(`${questions.length} questions imported successfully!`);
+      setStatus('Ingestion complete. Metrics updated.');
+      toast.success(`${questions.length} clinical datasets ingested successfully!`);
       setFile(null);
     } catch (error: any) {
-      console.error(error);
-      toast.error(error.message || 'Failed to process document');
-      setStatus('Error: ' + error.message);
+      toast.error(error.message || 'Telemetry failure during document processing');
+      setStatus('Terminal Error: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <Card className="border-dashed border-2 border-primary/20 bg-primary/5">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5 text-primary" />
-          Bulk Data Import
-        </CardTitle>
-        <CardDescription>
-          Upload .docx files containing your questions. Our AI will automatically structure them for your library.
-        </CardDescription>
+    <Card className="border-none shadow-2xl shadow-muted/5 bg-card/50 backdrop-blur-md rounded-[2.5rem] overflow-hidden border border-border/40">
+      <CardHeader className="p-10 pb-6 relative overflow-hidden">
+        <div className="relative z-10 space-y-1">
+          <CardTitle className="text-sm font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
+            <Database className="h-4 w-4" strokeWidth={3} />
+            Bulk Asset Ingestion
+          </CardTitle>
+          <CardDescription className="text-xs font-bold text-muted-foreground/60 uppercase tracking-widest">AI-Driven Tactical Data Structuring</CardDescription>
+        </div>
+        <FileUp className="absolute -right-8 -top-8 h-32 w-32 opacity-5 -rotate-12" />
       </CardHeader>
-      <CardContent className="space-y-4">
-        <div className="space-y-4">
-          <div className="space-y-2">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Reference PDF (Context)</Label>
+      <CardContent className="p-10 pt-0 space-y-8">
+        <div className="space-y-6">
+          <div className="space-y-3">
+            <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground/60 ml-1">Relational Context (Primary Reference)</Label>
             <Select value={selectedSourceId} onValueChange={setSelectedSourceId}>
-              <SelectTrigger className="h-12 rounded-xl bg-background/50 border-muted">
-                <SelectValue placeholder="Select reference from library..." />
+              <SelectTrigger className="h-14 rounded-2xl bg-muted/20 border-none focus:ring-2 focus:ring-primary/20 shadow-inner px-6 text-sm font-medium">
+                <SelectValue placeholder="Select reference from core library..." />
               </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">No specific reference</SelectItem>
+              <SelectContent className="rounded-2xl border-none shadow-2xl">
+                <SelectItem value="none">Isolated Import (No Reference)</SelectItem>
                 {pdfs.map(pdf => (
                   <SelectItem key={pdf.id} value={pdf.id}>{pdf.title}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-[10px] text-muted-foreground ml-1 italic">Extracted questions will be linked to this document.</p>
+            <p className="text-[10px] text-muted-foreground/40 ml-1 font-medium flex items-center gap-2">
+              <Command className="h-3 w-3" />
+              Intelligence will be logically mapped to the selected asset.
+            </p>
           </div>
 
-          <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed border-muted rounded-2xl bg-background/50 text-center cursor-pointer hover:bg-muted/50 transition-colors relative">
-          <input 
-            type="file" 
-            accept=".docx" 
-            onChange={handleFileChange}
-            className="absolute inset-0 opacity-0 cursor-pointer"
-            disabled={loading}
-          />
-          {file ? (
-            <div className="space-y-2">
-              <FileText className="h-10 w-10 text-primary mx-auto" />
-              <p className="text-sm font-bold">{file.name}</p>
-              <p className="text-xs text-muted-foreground">{(file.size / 1024).toFixed(2)} KB</p>
+          <div className="group relative">
+            <div className={`p-12 border-2 border-dashed rounded-[2.5rem] bg-muted/10 text-center cursor-pointer transition-all duration-500 overflow-hidden relative ${file ? 'border-primary bg-primary/5' : 'border-border/40 hover:border-primary/30 hover:bg-muted/20'}`}>
+              <input 
+                type="file" 
+                accept=".docx" 
+                onChange={handleFileChange}
+                className="absolute inset-0 opacity-0 cursor-pointer z-20"
+                disabled={loading}
+              />
+              
+              <AnimatePresence mode="wait">
+                {file ? (
+                  <motion.div 
+                    key="file-selected"
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="space-y-4 relative z-10"
+                  >
+                    <div className="h-16 w-16 bg-primary/10 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 border border-primary/20 shadow-xl shadow-primary/5">
+                      <FileText className="h-8 w-8 text-primary" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black tracking-tight">{file.name}</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mt-1">Payload size: {(file.size / 1024).toFixed(2)} KB</p>
+                    </div>
+                  </motion.div>
+                ) : (
+                  <motion.div 
+                    key="no-file"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="space-y-4 relative z-10"
+                  >
+                    <div className="h-16 w-16 bg-muted/20 rounded-[1.5rem] flex items-center justify-center mx-auto mb-4 group-hover:scale-110 group-hover:-rotate-6 transition-all border border-border/50">
+                      <Upload className="h-8 w-8 text-muted-foreground group-hover:text-primary transition-colors" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-black tracking-tight">Stage Intelligence Asset</p>
+                      <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 mt-1">Accepting medical .docx protocols only</p>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+              
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
             </div>
-          ) : (
-            <div className="space-y-2">
-              <Upload className="h-10 w-10 text-muted-foreground mx-auto" />
-              <p className="text-sm font-bold">Click or drag & drop</p>
-              <p className="text-xs text-muted-foreground">Support for .docx medical scripts</p>
-            </div>
-          )}
+          </div>
         </div>
-      </div>
 
-      {loading && (
-          <div className="space-y-2">
-            <div className="flex justify-between text-xs font-bold uppercase tracking-widest text-muted-foreground">
-              <span>{status}</span>
-              <span>{progress}%</span>
+        {loading && (
+          <div className="space-y-3 animate-in fade-in slide-in-from-top-2 duration-300">
+            <div className="flex justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              <span className="flex items-center gap-2">
+                <Loader2 className="h-3 w-3 animate-spin text-primary" />
+                {status}
+              </span>
+              <span className="text-primary">{progress}%</span>
             </div>
-            <Progress value={progress} className="h-2" />
+            <Progress value={progress} className="h-1.5 bg-muted/30" />
           </div>
         )}
 
         <Button 
-          className="w-full flex items-center justify-center gap-2 h-12 text-sm font-bold rounded-xl shadow-lg shadow-primary/20"
+          className="w-full h-16 rounded-2xl text-xs font-black uppercase tracking-widest bg-primary hover:bg-primary/90 shadow-2xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98] disabled:opacity-50 disabled:grayscale"
           onClick={processFile}
           disabled={!file || loading}
         >
           {loading ? (
             <>
-              <Loader2 className="h-4 w-4 animate-spin" />
-              Processing...
+              <Loader2 className="h-4 w-4 animate-spin mr-3" />
+              Processing Command...
             </>
           ) : (
             <>
-              <CheckCircle2 className="h-4 w-4" />
-              Start Bulk Import
+              <Sparkles className="h-4 w-4 mr-3" strokeWidth={3} />
+              Execute Neural Import
             </>
           )}
         </Button>
 
-        <div className="flex items-start gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-600 dark:text-amber-400">
-          <AlertCircle className="h-4 w-4 mt-0.5" />
-          <p className="text-[10px] leading-relaxed font-medium">
-            AI processing might take up to 30 seconds for large files. Ensure questions have clear options and explanations for best results.
+        <div className="flex items-start gap-4 p-6 rounded-2xl bg-amber-500/5 border border-amber-500/10 text-amber-600 dark:text-amber-400">
+          <AlertCircle className="h-5 w-5 mt-0.5 shrink-0" />
+          <p className="text-[10px] leading-relaxed font-bold uppercase tracking-wide">
+            Neural processing latency is expected to be ~30s for large clinical datasets. Ensure input documents utilize standard medical formatting for maximum accuracy.
           </p>
         </div>
       </CardContent>
     </Card>
   );
 }
+

@@ -422,21 +422,21 @@ export default function StudyModules() {
 
         <TabsContent value="modules" className="space-y-6">
           <div className="flex flex-col sm:flex-row gap-4">
-            <div className="relative w-full sm:w-64">
+            <div className="relative flex-none w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Search modules..."
-                className="pl-9 rounded-2xl h-11"
+                className="pl-9 rounded-2xl h-11 w-full"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 items-center">
+            <div className="flex gap-2 overflow-x-auto pb-2 sm:pb-0 items-center flex-1 min-w-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
               {categories.map((cat) => (
                 <Badge
                   key={cat}
                   variant={selectedCategory === cat ? "default" : "outline"}
-                  className="h-9 cursor-pointer whitespace-nowrap px-4 rounded-full font-bold uppercase text-[10px] tracking-widest transition-all"
+                  className="h-9 cursor-pointer whitespace-nowrap px-4 rounded-full font-bold uppercase text-[10px] tracking-widest transition-all shrink-0"
                   onClick={() => setSelectedCategory(cat)}
                 >
                   {cat}
@@ -449,7 +449,7 @@ export default function StudyModules() {
                 className={buttonVariants({
                   variant: "outline",
                   size: "sm",
-                  className: "rounded-full shadow-sm ml-auto",
+                  className: "rounded-full shadow-sm ml-auto shrink-0",
                 })}
               >
                 Manage Modules

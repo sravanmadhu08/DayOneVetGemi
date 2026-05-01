@@ -40,13 +40,31 @@ export default function ModuleDetail() {
 
   useEffect(() => {
     if (!moduleId) return;
-    const unsubscribe = onSnapshot(doc(db, 'modules', moduleId), (snap) => {
-      if (snap.exists()) {
-        setModule({ id: snap.id, ...snap.data() } as StudyModule);
+
+    const fetchModule = async () => {
+      try {
+        setIsLoadingModule(true);
+
+        const moduleRef = doc(db, "modules", moduleId);
+        const moduleSnap = await getDoc(moduleRef);
+
+        if (!moduleSnap.exists()) {
+          setModule(null);
+          return;
+        }
+
+        setModule({
+          id: moduleSnap.id,
+          ...moduleSnap.data(),
+        } as StudyModule);
+      } catch (error) {
+        handleFirestoreError(error, OperationType.READ, "modules");
+      } finally {
+        setIsLoadingModule(false);
       }
-      setIsLoadingModule(false);
-    });
-    return () => unsubscribe();
+    };
+
+    fetchModule();
   }, [moduleId]);
 
   // Split content by ## headings or use explicit sections

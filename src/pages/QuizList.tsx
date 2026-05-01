@@ -81,39 +81,50 @@ export default function QuizList() {
   }, [user]);
 
   useEffect(() => {
-    const fetchUserData = async () => {
-      if (!user) return;
-      try {
-        // Fetch custom questions (specific to user)
-        const qCustom = query(
-          collection(db, "questions"),
-          where("userId", "==", user.uid),
-        );
-        const unsubCustom = onSnapshot(qCustom, (snap) => {
-          setCustomQuestions(snap.docs.map(d => ({ id: d.id, ...d.data() } as Question)));
-        }, (error) => {
-          handleFirestoreError(error, OperationType.LIST, "questions");
-        });
+    if (!user) return;
 
-        // Fetch completed question IDs
-        const qCompleted = query(
-          collection(db, "users", user.uid, "completedPracticeQuestions"),
-        );
-        const unsubCompleted = onSnapshot(qCompleted, (snap) => {
-           setCompletedQuestionIds(snap.docs.map((d) => d.id));
-        }, (error) => {
-           handleFirestoreError(error, OperationType.LIST, "completedPracticeQuestions");
-        });
+    const qCustom = query(
+      collection(db, "questions"),
+      where("userId", "==", user.uid)
+    );
 
-        return () => {
-          unsubCustom();
-          unsubCompleted();
-        }
-      } catch (err) {
-        console.error("Error fetching user data:", err);
+    const unsubCustom = onSnapshot(
+      qCustom,
+      (snap) => {
+        setCustomQuestions(
+          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question)
+        );
+      },
+      (error) => {
+        handleFirestoreError(error, OperationType.LIST, "questions");
       }
+    );
+
+    const qCompleted = collection(
+      db,
+      "users",
+      user.uid,
+      "completedPracticeQuestions"
+    );
+
+    const unsubCompleted = onSnapshot(
+      qCompleted,
+      (snap) => {
+        setCompletedQuestionIds(snap.docs.map((d) => d.id));
+      },
+      (error) => {
+        handleFirestoreError(
+          error,
+          OperationType.LIST,
+          "completedPracticeQuestions"
+        );
+      }
+    );
+
+    return () => {
+      unsubCustom();
+      unsubCompleted();
     };
-    fetchUserData();
   }, [user]);
 
   const pool = React.useMemo(() => [...customQuestions, ...globalQuestions], [customQuestions, globalQuestions]);

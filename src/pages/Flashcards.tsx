@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/src/hooks/useAuth';
 import { toast } from 'sonner';
@@ -33,11 +33,18 @@ import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { 
   collection, 
   addDoc, 
+  updateDoc,
+  deleteDoc,
+  doc,
   serverTimestamp,
   onSnapshot,
   query,
-  where
+  where,
+  limit,
+  orderBy
 } from 'firebase/firestore';
+
+const FLASHCARD_READ_LIMIT = 500;
 import { calculateNextReview, ReviewQuality } from '@/src/lib/srs';
 import { firebaseService } from '@/src/services/firebaseService';
 import ReactMarkdown from 'react-markdown';
@@ -86,11 +93,45 @@ export default function Flashcards() {
     return text.trim().split(/\s+/).length;
   };
 
+  const { filteredCards, groupedDecks, sortedDecks } = useMemo(() => {
+    const searchLower = librarySearchQuery.toLowerCase();
+    const filtered = cards.filter(card => {
+      const deck = card.deck || 'General';
+      const front = card.front || '';
+      const back = card.back || '';
+      return (
+        front.toLowerCase().includes(searchLower) ||
+        back.toLowerCase().includes(searchLower) ||
+        deck.toLowerCase().includes(searchLower)
+      );
+    });
+
+    const grouped: Record<string, Flashcard[]> = {};
+    filtered.forEach(card => {
+      const key = card.deck || 'General';
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(card);
+    });
+
+    const sorted = Object.keys(grouped).sort();
+    return { filteredCards: filtered, groupedDecks: grouped, sortedDecks: sorted };
+  }, [cards, librarySearchQuery]);
+
   useEffect(() => {
     if (!user) return;
 
-    const qSystem = query(collection(db, 'flashcards'), where('userId', 'in', ['system', null]));
-    const qUser = query(collection(db, 'flashcards'), where('userId', '==', user.uid));
+    const qSystem = query(
+      collection(db, 'flashcards'), 
+      where('userId', 'in', ['system', null]),
+      orderBy("createdAt", "desc"),
+      limit(FLASHCARD_READ_LIMIT)
+    );
+    const qUser = query(
+      collection(db, 'flashcards'), 
+      where('userId', '==', user.uid),
+      orderBy("createdAt", "desc"),
+      limit(FLASHCARD_READ_LIMIT)
+    );
     
     let systemCards: Flashcard[] = [];
     let userCards: Flashcard[] = [];
@@ -411,18 +452,6 @@ export default function Flashcards() {
 
           <div className="grid gap-12">
             {(() => {
-              const filteredCards = cards.filter(card => {
-                const searchLower = librarySearchQuery.toLowerCase();
-                const deck = card.deck || 'General';
-                const front = card.front || '';
-                const back = card.back || '';
-                return (
-                  front.toLowerCase().includes(searchLower) ||
-                  back.toLowerCase().includes(searchLower) ||
-                  deck.toLowerCase().includes(searchLower)
-                );
-              });
-
               if (filteredCards.length === 0) {
                 return (
                   <div className="py-24 text-center space-y-6">
@@ -437,16 +466,7 @@ export default function Flashcards() {
                 );
               }
 
-              const grouped: Record<string, Flashcard[]> = {};
-              filteredCards.forEach(card => {
-                const key = card.deck || 'General';
-                if (!grouped[key]) grouped[key] = [];
-                grouped[key].push(card);
-              });
-
-              const decks = Object.keys(grouped).sort();
-
-              return decks.map(deck => (
+              return sortedDecks.map(deck => (
                 <div key={deck} className="space-y-6">
                   <div className="flex items-center justify-between pb-4 border-b border-border/50">
                     <div className="flex items-center gap-4">
@@ -455,13 +475,13 @@ export default function Flashcards() {
                        </div>
                        <div>
                           <h3 className="text-lg font-black tracking-tight uppercase">{deck}</h3>
-                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{grouped[deck].length} Protocols Loaded</p>
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">{groupedDecks[deck].length} Protocols Loaded</p>
                        </div>
                     </div>
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {grouped[deck].map(card => {
+                    {groupedDecks[deck].map(card => {
                       const isCurrentlyFlipped = flippedCardId === card.id;
                       return (
                         <Card 

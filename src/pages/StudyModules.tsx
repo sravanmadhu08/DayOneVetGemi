@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { StudyModule } from "@/src/types";
 import {
@@ -46,7 +46,6 @@ import {
   collection,
   getDocs,
   addDoc,
-  onSnapshot,
   query,
   where,
   orderBy,
@@ -118,60 +117,82 @@ export default function StudyModules() {
   // Fetch Modules from Firestore
   useEffect(() => {
     if (!user) return;
-    const q = query(collection(db, "modules"), orderBy("order", "asc"));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      const moduleData = snap.docs.map(
-        (doc) => ({ id: doc.id, ...doc.data() }) as StudyModule,
-      );
-      setModules(moduleData);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "modules");
-    });
-    return () => unsubscribe();
+
+    const fetchModules = async () => {
+      try {
+        const qModules = query(
+          collection(db, "modules"),
+          orderBy("order", "asc")
+        );
+
+        const snap = await getDocs(qModules);
+
+        setModules(
+          snap.docs.map(
+            (doc) => ({ id: doc.id, ...doc.data() }) as StudyModule
+          )
+        );
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, "modules");
+      }
+    };
+
+    fetchModules();
   }, [user]);
 
   useEffect(() => {
     if (!user) return;
 
-    // Fetch PDFs from Firestore
-    const qPdfs = query(
-      collection(db, "pdfs"),
-      where("userId", "in", [user.uid, "system", null]),
-      orderBy("createdAt", "desc"),
-    );
+    const fetchLibraryData = async () => {
+      try {
+        const [pdfSnap, guidelineSnap, resourceSnap] = await Promise.all([
+          getDocs(
+            query(
+              collection(db, "pdfs"),
+              where("userId", "in", [user.uid, "system", null]),
+              orderBy("createdAt", "desc")
+            )
+          ),
+          getDocs(
+            query(
+              collection(db, "guidelines"),
+              orderBy("createdAt", "desc")
+            )
+          ),
+          getDocs(
+            query(
+              collection(db, "resources"),
+              orderBy("order", "asc")
+            )
+          ),
+        ]);
 
-    const unsubscribePdfs = onSnapshot(qPdfs, (snap) => {
-      const pdfData = snap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
-      setPdfs(pdfData);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "pdfs");
-    });
+        setPdfs(
+          pdfSnap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+        );
 
-    const qGuidelines = query(
-      collection(db, "guidelines"),
-      orderBy("createdAt", "desc"),
-    );
-    const unsubscribeGuidelines = onSnapshot(qGuidelines, (snap) => {
-      setGuidelines(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "guidelines");
-    });
+        setGuidelines(
+          guidelineSnap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+        );
 
-    const qResources = query(
-      collection(db, "resources"),
-      orderBy("order", "asc")
-    );
-    const unsubscribeResources = onSnapshot(qResources, (snap) => {
-      setResources(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "resources");
-    });
-
-    return () => {
-      unsubscribePdfs();
-      unsubscribeGuidelines();
-      unsubscribeResources();
+        setResources(
+          resourceSnap.docs.map((doc) => ({
+            id: doc.id,
+            ...doc.data(),
+          }))
+        );
+      } catch (error) {
+        handleFirestoreError(error, OperationType.LIST, "library data");
+      }
     };
+
+    fetchLibraryData();
   }, [user]);
 
   useEffect(() => {
@@ -196,7 +217,9 @@ export default function StudyModules() {
     fetchDetailedProgress();
   }, [user]);
 
-  const categories = ["All", ...new Set(modules.map((m) => m.category))];
+  const categories = useMemo(() => {
+    return ["All", ...new Set(modules.map((m) => m.category).filter(Boolean))];
+  }, [modules]);
 
   const handleUpload = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -211,24 +234,11 @@ export default function StudyModules() {
       let finalSize = "1.2 MB";
 
       if (selectedFile) {
-        if (selectedFile.size > 700000) {
-          // ~700KB limit for base64 in 1MB Firestore doc
-          toast.error(
-            "File is too large for database storage (max 700KB). Please compress or provide a direct link in the URL field instead.",
-          );
-          setIsUploading(false);
-          return;
-        }
-
-        finalSize = `${(selectedFile.size / (1024 * 1024)).toFixed(2)} MB`;
-
-        // Read file as base64
-        finalUrl = await new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(selectedFile);
-          reader.onload = () => resolve(reader.result as string);
-          reader.onerror = (error) => reject(error);
-        });
+        toast.error(
+          "Please upload the PDF somewhere else and paste a direct URL. Storing PDFs inside Firestore can become expensive quickly."
+        );
+        setIsUploading(false);
+        return;
       } else if (!pdfUrl) {
         toast.error("Please provide a URL or select a file.");
         setIsUploading(false);
@@ -336,15 +346,34 @@ export default function StudyModules() {
     }
   };
 
-  const filteredModules = modules.filter((module) => {
-    const matchesSearch =
-      module.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      module.category.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      module.content.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === "All" || module.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
+  const filteredModules = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+
+    return modules.filter((module) => {
+      const matchesSearch =
+        !q ||
+        module.title?.toLowerCase().includes(q) ||
+        module.category?.toLowerCase().includes(q) ||
+        module.content?.toLowerCase().includes(q);
+
+      const matchesCategory =
+        selectedCategory === "All" || module.category === selectedCategory;
+
+      return matchesSearch && matchesCategory;
+    });
+  }, [modules, searchQuery, selectedCategory]);
+
+  const activeModules = useMemo(() => {
+    return filteredModules.filter(
+      (m) => profile?.progress?.[m.id]?.score !== 100
+    );
+  }, [filteredModules, profile?.progress]);
+
+  const masteredModules = useMemo(() => {
+    return filteredModules.filter(
+      (m) => profile?.progress?.[m.id]?.score === 100
+    );
+  }, [filteredModules, profile?.progress]);
 
   return (
     <div className="space-y-8">
@@ -443,8 +472,7 @@ export default function StudyModules() {
 
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <AnimatePresence mode="popLayout">
-                {filteredModules
-                  .filter((m) => profile?.progress?.[m.id]?.score !== 100)
+                {activeModules
                   .map((module) => {
                     const prog = detailedProgress[module.id];
                     const percent = prog
@@ -529,9 +557,7 @@ export default function StudyModules() {
                     );
                   })}
               </AnimatePresence>
-              {filteredModules.filter(
-                (m) => profile?.progress?.[m.id]?.score !== 100,
-              ).length === 0 &&
+              {activeModules.length === 0 &&
                 filteredModules.length > 0 && (
                   <div className="col-span-full py-10 text-center space-y-4">
                     <h3 className="text-xl font-bold">All caught up!</h3>
@@ -555,9 +581,7 @@ export default function StudyModules() {
           </div>
 
           {/* Mastered Modules Section */}
-          {filteredModules.some(
-            (m) => profile?.progress?.[m.id]?.score === 100,
-          ) && (
+          {masteredModules.length > 0 && (
             <div className="pb-8 space-y-4">
               <div className="flex justify-between items-center bg-green-500/5 p-4 rounded-2xl border border-green-500/10">
                 <div className="space-y-1">
@@ -570,8 +594,7 @@ export default function StudyModules() {
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {filteredModules
-                  .filter((m) => profile?.progress?.[m.id]?.score === 100)
+                {masteredModules
                   .map((module) => (
                     <Card
                       key={module.id}

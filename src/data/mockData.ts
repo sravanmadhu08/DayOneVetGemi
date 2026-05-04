@@ -108,6 +108,78 @@ export const QUESTION_POOL: Question[] = [
     explanation: 'GDV stands for Gastric Dilatation-Volvulus, a life-threatening condition in dogs.',
     species: ['Canine'],
     system: 'Digestive'
+  },
+  {
+    id: 'q13',
+    question: 'Secondary hyperparathyroidism is most commonly associated with which chronic condition in cats?',
+    options: ['Hyperthyroidism', 'Chronic Renal Failure', 'Diabetes Mellitus', 'Hepatic Lipidosis'],
+    correctAnswer: 1,
+    explanation: 'Chronic renal failure leads to phosphorus retention and decreased calcitriol, triggering PTH release.',
+    species: ['Feline'],
+    system: 'Endocrinology'
+  },
+  {
+    id: 'q14',
+    question: 'Which of the following is the preferred site for intraosseous (IO) catheter placement in a kitten?',
+    options: ['Proximal humerus', 'Distal radius', 'Proximal tibia', 'Wings of the ileum'],
+    correctAnswer: 2,
+    explanation: 'The proximal tibia is the most common and accessible site for IO access in neonates and small pediatric patients.',
+    species: ['Feline', 'Canine'],
+    system: 'Emergency'
+  },
+  {
+    id: 'q15',
+    question: 'In bovine medicine, "Hardware Disease" is technically known as:',
+    options: ['Abomasal Ulcer', 'Traumatic Reticuloperitonitis', 'Cecal Volvulus', 'Vagal Indigestion'],
+    correctAnswer: 1,
+    explanation: 'It is caused by the ingestion of metallic objects that penetrate the reticulum.',
+    species: ['Bovine'],
+    system: 'Digestive'
+  },
+  {
+    id: 'q16',
+    question: 'What is the most characteristic finding on a blood smear of a dog with immune-mediated hemolytic anemia (IMHA)?',
+    options: ['Echinocytes', 'Spherocytes', 'Schistocytes', 'Target cells'],
+    correctAnswer: 1,
+    explanation: 'Spherocytes are small, dense red blood cells lacking central pallor, formed when macrophages remove part of the antibody-coated membrane.',
+    species: ['Canine'],
+    system: 'Hematology'
+  },
+  {
+    id: 'q17',
+    question: 'Which cranial nerve is tested by the menace response?',
+    options: ['CN II and CN VII', 'CN III and CN VI', 'CN II and CN III', 'CN V and CN VII'],
+    correctAnswer: 0,
+    explanation: 'The menace response tests the optic nerve (sensory) and the facial nerve (motor to close eyelids).',
+    species: ['Canine', 'Feline', 'Equine', 'Bovine'],
+    system: 'Neurology'
+  },
+  {
+    id: 'q18',
+    question: 'A horse with "Sweet Itch" is reacting to the bite of which insect?',
+    options: ['Stable fly', 'Culicoides (Midges)', 'Deer fly', 'Tick'],
+    correctAnswer: 1,
+    explanation: 'Sweet itch is a hypersensitivity reaction to the saliva of Culicoides species.',
+    species: ['Equine'],
+    system: 'Dermatology'
+  },
+  {
+    id: 'q19',
+    question: 'What is the primary treatment for a dog that has ingested a large amount of dark chocolate (Theobromine)?',
+    options: ['Induce emesis & charcoal', 'Blood transfusion', 'Antibiotics', 'Insulin'],
+    correctAnswer: 0,
+    explanation: 'Decontamination is key if ingestion was recent, followed by supportive care for cardiac and CNS signs.',
+    species: ['Canine'],
+    system: 'Toxicology'
+  },
+  {
+    id: 'q20',
+    question: 'Which diagnostic test is used to detect "Cushing\'s Disease" by measuring cortisol response to a potent steroid?',
+    options: ['ACTH Stim', 'LDDST', 'Bile Acids', 'T4 level'],
+    correctAnswer: 1,
+    explanation: 'Low-Dose Dexamethasone Suppression Test is a common diagnostic test for Hyperadrenocorticism.',
+    species: ['Canine'],
+    system: 'Endocrinology'
   }
 ];
 

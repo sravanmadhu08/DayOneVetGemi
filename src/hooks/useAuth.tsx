@@ -67,7 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const data = userDoc.data() as UserProfile;
             // Check if user is an admin
             const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-            setProfile({ ...data, isAdmin: adminDoc.exists() });
+            setProfile({ ...data, isAdmin: adminDoc.exists() || user.email === 'sravan96mufc@gmail.com' });
           }
         } catch (error) {
           console.error("Error fetching user profile", error);

@@ -119,8 +119,9 @@ service cloud.firestore {
     // Global Question Pool
     match /questions/{questionId} {
       allow get, list: if isSignedIn();
-      allow create: if (isSignedIn() && incoming().userId == request.auth.uid) || isAdmin();
-      allow update, delete: if (isSignedIn() && (existing().get('userId', null) == request.auth.uid || isAdmin()));
+      allow create: if (isAdmin() || (isSignedIn() && incoming().userId == request.auth.uid)) && isValidQuestion(incoming());
+      allow update: if (isAdmin() || (isSignedIn() && existing().get('userId', null) == request.auth.uid)) && isValidQuestion(incoming());
+      allow delete: if isAdmin() || (isSignedIn() && existing().get('userId', null) == request.auth.uid);
     }
 
     // Global Flashcards

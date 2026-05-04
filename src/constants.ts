@@ -58,5 +58,23 @@ export const DEFAULT_QUESTIONS = [
     species: ["Canine", "Feline"],
     system: "Oncology",
     userId: null
+  },
+  {
+    question: "Secondary hyperparathyroidism is most commonly associated with which chronic condition in cats?",
+    options: ["Hyperthyroidism", "Chronic Renal Failure", "Diabetes Mellitus", "Hepatic Lipidosis"],
+    correctAnswer: 1,
+    explanation: "Chronic renal failure leads to phosphorus retention and decreased calcitriol, triggering PTH release.",
+    species: ["Feline"],
+    system: "Endocrinology",
+    userId: null
+  },
+  {
+    question: "Which of the following is the preferred site for intraosseous (IO) catheter placement in a kitten?",
+    options: ["Proximal humerus", "Distal radius", "Proximal tibia", "Wings of the ileum"],
+    correctAnswer: 2,
+    explanation: "The proximal tibia is the most common and accessible site for IO access in neonates and small pediatric patients.",
+    species: ["Feline", "Canine"],
+    system: "Emergency",
+    userId: null
   }
 ];

@@ -12,7 +12,8 @@ const __dirname = path.dirname(__filename);
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  const PORT = Number(process.env.PORT || 3000);
+  const isProduction = process.env.NODE_ENV === 'production';
 
   console.log('Starting backend services...');
   
@@ -160,13 +161,6 @@ except Exception as e:
     const seedSettings = "from accounts.models import GlobalSetting; GlobalSetting.objects.get_or_create(key='global', defaults={'value': {'isFreeMode': True}, 'description': 'Main global settings'})";
     await execPromise(python, ['backend/manage.py', 'shell', '-c', seedSettings]);
 
-    // Create superuser if it doesn't exist, or reset password
-    writeLog('Ensuring superuser exists and password is set...\n');
-    const createSuperUser = "from django.contrib.auth import get_user_model; User = get_user_model(); admin = User.objects.filter(username='admin').first(); (admin and admin.set_password('admin123') or admin) or User.objects.create_superuser('admin', 'admin@example.com', 'admin123'); admin and admin.save()";
-    // Safer version:
-    const safeSuperUser = "from django.contrib.auth import get_user_model; User = get_user_model(); u, c = User.objects.get_or_create(username='admin', defaults={'email': 'admin@example.com', 'is_staff': True, 'is_superuser': True}); u.set_password('admin123'); u.save()";
-    await execPromise(python, ['backend/manage.py', 'shell', '-c', safeSuperUser]);
-
     // Start server
     console.log('Starting Django server on port 8001...');
     writeLog('--- Starting Django server on port 8001 ---\n');
@@ -188,7 +182,9 @@ except Exception as e:
     });
   };
 
-  setupBackend(); // Start backend setup immediately after declaration
+  if (!isProduction) {
+    setupBackend(); // Start backend setup only for local development.
+  }
 
   // Proxy API requests to Django
   app.use(createProxyMiddleware({
@@ -225,7 +221,7 @@ except Exception as e:
     pathFilter: '/static',
   }));
 
-  if (process.env.NODE_ENV !== 'production') {
+  if (!isProduction) {
     console.log('Starting Vite in middleware mode...');
     const vite = await createViteServer({
       server: { middlewareMode: true },
@@ -240,7 +236,7 @@ except Exception as e:
     });
   }
 
-  app.listen(PORT, '127.0.0.1', () => {
+  app.listen(PORT, isProduction ? '0.0.0.0' : '127.0.0.1', () => {
     console.log(`Server running at http://localhost:${PORT}`);
   });
 }

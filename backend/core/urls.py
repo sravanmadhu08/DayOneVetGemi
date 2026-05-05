@@ -33,23 +33,9 @@ router.register(r'resources', ResourceViewSet)
 router.register(r'subscription', SubscriptionViewSet, basename='subscription')
 
 def health_check(request):
-    db_path = settings.BASE_DIR / 'db.sqlite3'
-    db_exists = db_path.exists()
-    user_count = 0
-    if db_exists:
-        try:
-            from django.contrib.auth.models import User
-            user_count = User.objects.count()
-        except:
-            pass
-            
     return JsonResponse({
         "status": "ok", 
         "message": "Backend is running",
-        "db_exists": db_exists,
-        "user_count": user_count,
-        "debug": settings.DEBUG,
-        "allowed_hosts": settings.ALLOWED_HOSTS
     })
 
 urlpatterns = [

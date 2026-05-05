@@ -51,7 +51,7 @@ def health_check(request):
     })
 
 urlpatterns = [
-    path('admin/', admin.site.urls),
+    path('django-admin/', admin.site.urls),
     path('api/health/', health_check, name='health_check'),
     path('api/auth/register/', RegisterView.as_view(), name='register'),
     path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

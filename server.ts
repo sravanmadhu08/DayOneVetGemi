@@ -224,7 +224,7 @@ except Exception as e:
     target: 'http://127.0.0.1:8001',
     changeOrigin: true,
     xfwd: true,
-    pathFilter: '/admin',
+    pathFilter: '/django-admin',
   }));
 
   // Proxy static files (Django)

@@ -87,6 +87,9 @@ export const api = {
   // Quizzes
   getQuestions: (params?: { system?: string; species?: string }) => 
     handleResponse<Question[]>(apiClient.get('/questions/', { params })),
+
+  getQuestionSession: (params: { system?: string; species?: string; count?: string | number; mode?: string }) =>
+    handleResponse<{ questions: Question[]; config: any }>(apiClient.get('/questions/session/', { params })),
   
   createQuestion: (data: any) => handleResponse<Question>(apiClient.post('/questions/', data)),
   updateQuestion: (id: string | number, data: any) => handleResponse<Question>(apiClient.patch(`/questions/${id}/`, data)),
@@ -118,6 +121,9 @@ export const api = {
 
   // Flashcards
   getFlashcards: () => handleResponse<Flashcard[]>(apiClient.get('/flashcards/')),
+
+  getDueFlashcards: (limit?: number) =>
+    handleResponse<Flashcard[]>(apiClient.get('/flashcards/due/', { params: limit ? { limit } : {} })),
   
   createFlashcard: (data: Partial<Flashcard>) => 
     handleResponse<Flashcard>(apiClient.post('/flashcards/', data)),

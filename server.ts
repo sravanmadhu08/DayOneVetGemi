@@ -15,6 +15,12 @@ async function startServer() {
   const PORT = Number(process.env.PORT || 3000);
   const isProduction = process.env.NODE_ENV === 'production';
 
+  if (isProduction) {
+    throw new Error(
+      'server.ts is local-development only. Build the frontend with `npm run build`, deploy `dist/` as static files, and run Django separately with Gunicorn.'
+    );
+  }
+
   console.log('Starting backend services...');
   
   const isWindows = process.platform === 'win32';
@@ -123,6 +129,9 @@ async function startServer() {
     console.log(`Using python: ${python}`);
     writeLog(`Using python: ${python}\n`);
     
+    // Keep the local dev Python environment aligned with backend/requirements.txt.
+    await execPromise(python, ['-m', 'pip', 'install', '-r', 'backend/requirements.txt']);
+
     // Try to install django globally/user-level if it's not there
     const hasDjango = await execPromise(python, ['-c', 'import django; print(django.get_version())']);
     if (hasDjango !== 0) {
@@ -182,9 +191,7 @@ except Exception as e:
     });
   };
 
-  if (!isProduction) {
-    setupBackend(); // Start backend setup only for local development.
-  }
+  setupBackend();
 
   // Proxy API requests to Django
   app.use(createProxyMiddleware({
@@ -221,22 +228,14 @@ except Exception as e:
     pathFilter: '/static',
   }));
 
-  if (!isProduction) {
-    console.log('Starting Vite in middleware mode...');
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: 'spa',
-    });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(__dirname, 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
-    });
-  }
+  console.log('Starting Vite in middleware mode...');
+  const vite = await createViteServer({
+    server: { middlewareMode: true },
+    appType: 'spa',
+  });
+  app.use(vite.middlewares);
 
-  app.listen(PORT, isProduction ? '0.0.0.0' : '127.0.0.1', () => {
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`Server running at http://localhost:${PORT}`);
   });
 }

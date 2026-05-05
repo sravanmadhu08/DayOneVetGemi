@@ -1,6 +1,9 @@
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
+from django.utils import timezone
 from .models import Flashcard, FlashcardProgress, MAX_CUSTOM_FLASHCARDS_PER_USER
 from .serializers import FlashcardSerializer, FlashcardProgressSerializer
 from core.permissions import IsAdminOrReadOnly, IsOwner
@@ -34,6 +37,33 @@ class FlashcardViewSet(viewsets.ModelViewSet):
                     )
                 })
         serializer.save(creator=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def due(self, request):
+        if request.user.is_staff:
+            visible_cards = Flashcard.objects.select_related('creator')
+        else:
+            visible_cards = Flashcard.objects.select_related('creator').filter(
+                Q(creator__isnull=True) | Q(creator=request.user)
+            )
+
+        due_progress = FlashcardProgress.objects.filter(
+            user=request.user,
+            flashcard_id__in=visible_cards.values('id'),
+            next_review__lte=timezone.now(),
+        ).values('flashcard_id')
+
+        queryset = visible_cards.filter(
+            Q(id__in=due_progress) |
+            ~Q(id__in=FlashcardProgress.objects.filter(user=request.user).values('flashcard_id'))
+        )
+
+        limit = request.query_params.get('limit')
+        if limit and limit.isdigit():
+            queryset = queryset[:int(limit)]
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
 class FlashcardProgressViewSet(viewsets.ModelViewSet):
     queryset = FlashcardProgress.objects.all()

@@ -35,7 +35,6 @@ import { api } from "@/src/lib/api";
 import { Question } from "@/src/types";
 import { useAuth } from "@/src/hooks/useAuth";
 import { toast } from "sonner";
-import { sampleShuffled } from "@/src/lib/collections";
 
 export default function QuizList() {
   const { user, profile } = useAuth();
@@ -160,25 +159,39 @@ export default function QuizList() {
     return Math.min(parseInt(countSelection), availableQuestions.length);
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     const count = getActualCount();
-    const selected = sampleShuffled(availableQuestions, count);
+    const mode = isTimed ? 'exam' : 'practice';
 
-    sessionStorage.setItem(
-      "vet_quiz_session",
-      JSON.stringify({
-        questions: selected,
-        config: {
+    try {
+      const session = await api.getQuestionSession({
+        species,
+        system,
+        count: countSelection === 'All' ? 'All' : count,
+        mode,
+      });
+
+      sessionStorage.setItem(
+        "vet_quiz_session",
+        JSON.stringify({
+          questions: session.questions,
+          config: {
+            ...session.config,
           species,
           system,
-          count: selected.length,
+            count: session.questions.length,
           isTimed,
-          duration: isTimed ? count * 120 : null,
+            duration: isTimed ? session.questions.length * 120 : null,
+          },
         },
-      }),
-    );
+        ),
+      );
 
-    navigate("/quizzes/session");
+      navigate("/quizzes/session");
+    } catch (error) {
+      console.error("Failed to start quiz session:", error);
+      toast.error("Failed to start quiz session");
+    }
   };
 
   return (

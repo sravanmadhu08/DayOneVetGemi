@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "tsx server.ts",
-    "start": "NODE_ENV=production tsx server.ts",
+    "start": "vite preview --host 0.0.0.0",
+    "start:backend": "cd backend && gunicorn core.wsgi:application --bind 0.0.0.0:$PORT",
     "build": "vite build",
     "preview": "vite preview",
     "clean": "rm -rf dist",

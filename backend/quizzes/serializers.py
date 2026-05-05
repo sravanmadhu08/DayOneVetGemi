@@ -29,6 +29,9 @@ class QuestionSerializer(serializers.ModelSerializer):
         return obj.image.url
 
     def get_isBookmarked(self, obj):
+        if hasattr(obj, 'is_bookmarked'):
+            return bool(obj.is_bookmarked)
+
         request = self.context.get('request')
         if not request or not request.user.is_authenticated:
             return False

@@ -10,13 +10,14 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key')
 
-DEBUG = os.getenv('DEBUG', 'False') == 'False'
+DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
 CSRF_TRUSTED_ORIGINS = [
     'https://*.run.app',
     'https://*.google.com',
+    'https://*.aistudio.google',
     'http://localhost:3000',
     'http://localhost:5173',
 ]

@@ -4,6 +4,7 @@ import { createProxyMiddleware } from 'http-proxy-middleware';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs';
+import net from 'net';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -21,93 +22,207 @@ async function startServer() {
     : path.join(__dirname, 'backend', 'venv', 'bin', 'python');
 
   // Order of preference: Virtual Env -> python3 -> python
-  const pythonCmds = [venvPython, 'python3', 'python'];
+  const pythonCmds = [venvPython, 'python3', 'python', '/usr/bin/python3', '/usr/bin/python'];
+  const pipCmds = ['pip3', 'pip', '/usr/bin/pip3', '/usr/bin/pip'];
 
-  const logFile = path.join(__dirname, 'backend_setup.log');
-  const logStream = fs.createWriteStream(logFile, { flags: 'a' });
+  const logFile = path.join(process.cwd(), 'backend.log');
+  fs.writeFileSync(logFile, `--- Log Start ${new Date().toISOString()} ---\n`);
+  const writeLog = (msg: string | Buffer) => {
+    fs.appendFileSync(logFile, msg);
+  };
 
-  const runDjangoCommand = (args: string[], onExit?: (code: number | null) => void) => {
-    let currentCmdIndex = 0;
+  console.log('[Server] Starting backend setup sequence...');
+  writeLog('[Server] Starting backend setup sequence...\n');
 
-    const attempt = () => {
-      const cmd = pythonCmds[currentCmdIndex];
-      
-      console.log(`[Backend] Attempting command with: ${cmd} ${args.join(' ')}`);
-      logStream.write(`\n--- [${new Date().toISOString()}] Attempting: ${cmd} ${args.join(' ')} ---\n`);
-
-      // Verify python version if it's the first time
-      if (args[0] === 'backend/manage.py') {
-        spawn(cmd, ['--version'], { stdio: 'inherit' });
-      }
-
+  const execPromise = (cmd: string, args: string[]) => {
+    return new Promise<number | null>((resolve) => {
+      const msg = `\n[Exec] ${cmd} ${args.join(' ')}\n`;
+      console.log(msg);
+      writeLog(msg);
       const proc = spawn(cmd, args, {
         stdio: ['inherit', 'pipe', 'pipe'],
         env: { ...process.env, PYTHONUNBUFFERED: '1' }
       });
 
       proc.stdout?.on('data', (data) => {
-        logStream.write(data);
+        writeLog(data);
         process.stdout.write(data);
       });
       proc.stderr?.on('data', (data) => {
-        logStream.write(data);
+        writeLog(data);
         process.stderr.write(data);
       });
 
       proc.on('error', (err: any) => {
-        if (err.code === 'ENOENT') {
-          if (currentCmdIndex < pythonCmds.length - 1) {
-            console.log(`[Backend] ${cmd} not found, trying next option...`);
-            currentCmdIndex++;
-            attempt();
-          } else {
-            console.error(`[Backend] Fatal: No Python executable found in path. tried: ${pythonCmds.join(', ')}`);
-          }
-        } else {
-          console.error(`[Backend] Failed to execute ${cmd}:`, err);
-        }
+        writeLog(`[Error] ${cmd}: ${err.message}\n`);
+        resolve(-1);
       });
 
-      if (onExit) {
-        proc.on('close', (code) => {
-          if (code !== 0 && code !== null) {
-            console.warn(`[Backend] Command "${cmd} ${args[0]}" exited with code ${code}.`);
-          }
-          onExit(code);
-        });
-      }
-
-      return proc;
-    };
-
-    return attempt();
+      proc.on('close', (code) => {
+        writeLog(`[Exit] ${cmd} code ${code}\n`);
+        resolve(code);
+      });
+    });
   };
 
+  const checkPort = (port: number) => {
+    return new Promise((resolve) => {
+      const socket = new net.Socket();
+      const h = setTimeout(() => {
+        socket.destroy();
+        resolve(false);
+      }, 1000);
+
+      socket.on('connect', () => {
+        clearTimeout(h);
+        socket.destroy();
+        resolve(true);
+      });
+      socket.on('error', () => {
+        clearTimeout(h);
+        socket.destroy();
+        resolve(false);
+      });
+      socket.connect(port, '127.0.0.1');
+    });
+  };
+
+  const setupBackend = async () => {
+    writeLog('[Setup] Starting setupBackend...\n');
+    try {
+      writeLog('[Setup] Checking port 8001...\n');
+      const isRunning = await checkPort(8001);
+      writeLog(`[Setup] Port 8001 status: ${isRunning}\n`);
+      if (isRunning) {
+        writeLog('Django is already running on port 8001!\n');
+        console.log('Django is already running on port 8001!');
+        return;
+      }
+    } catch (e: any) {
+      writeLog(`[Setup] Error checking port: ${e.message}\n`);
+    }
+    
+    writeLog('[Setup] Proceeding with python search...\n');
+    const venvDir = path.join(__dirname, 'backend', 'venv');
+    if (fs.existsSync(venvDir)) {
+      writeLog(`Cleaning up existing venv at ${venvDir}\n`);
+      try {
+        fs.rmSync(venvDir, { recursive: true, force: true });
+      } catch (e: any) {
+        writeLog(`Failed to clean venv: ${e.message}\n`);
+      }
+    }
+
+    const possiblePythons = ['python3', 'python', '/usr/bin/python3', '/usr/bin/python'];
+    let python = '';
+    
+    for (const c of possiblePythons) {
+      const code = await execPromise(c, ['--version']);
+      if (code === 0) {
+        python = c;
+        break;
+      }
+    }
+
+    if (!python) {
+      writeLog('[Fatal] No python found\n');
+      return;
+    }
+
+    console.log(`Using python: ${python}`);
+    writeLog(`Using python: ${python}\n`);
+    
+    // Try to install django globally/user-level if it's not there
+    const hasDjango = await execPromise(python, ['-c', 'import django; print(django.get_version())']);
+    if (hasDjango !== 0) {
+      writeLog('Django not found, checking for pip...\n');
+      const hasPip = await execPromise(python, ['-m', 'pip', '--version']);
+      if (hasPip !== 0) {
+        writeLog('Pip not found, attempting to bootstrap it via urllib...\n');
+        const bootstrapCode = `
+import urllib.request
+import os
+try:
+    print("Downloading get-pip.py...")
+    urllib.request.urlretrieve("https://bootstrap.pypa.io/get-pip.py", "get-pip.py")
+    print("get-pip.py downloaded.")
+except Exception as e:
+    print(f"Download failed: {e}")
+    exit(1)
+`;
+        const downloadResult = await execPromise(python, ['-c', bootstrapCode]);
+        if (downloadResult === 0) {
+          writeLog('Installing pip...\n');
+          await execPromise(python, ['get-pip.py', '--user']);
+        }
+      }
+      
+      writeLog('Attempting to install requirements...\n');
+      await execPromise(python, ['-m', 'pip', 'install', '--user', 'django', 'djangorestframework', 'django-cors-headers', 'python-dotenv', 'djangorestframework-simplejwt']);
+    }
+
+    // Run migrations
+    await execPromise(python, ['backend/manage.py', 'makemigrations']);
+    await execPromise(python, ['backend/manage.py', 'migrate']);
+    
+    // Ensure default settings exist
+    writeLog('Ensuring default settings exist...\n');
+    const seedSettings = "from accounts.models import GlobalSetting; GlobalSetting.objects.get_or_create(key='global', defaults={'value': {'isFreeMode': True}, 'description': 'Main global settings'})";
+    await execPromise(python, ['backend/manage.py', 'shell', '-c', seedSettings]);
+
+    // Start server
+    console.log('Starting Django server on port 8001...');
+    writeLog('--- Starting Django server on port 8001 ---\n');
+    const djangoProc = spawn(python, ['backend/manage.py', 'runserver', '0.0.0.0:8001'], {
+      stdio: ['inherit', 'pipe', 'pipe'],
+      env: { ...process.env, PYTHONUNBUFFERED: '1' }
+    });
+    
+    djangoProc.stdout?.on('data', (data) => writeLog(data));
+    djangoProc.stderr?.on('data', (data) => writeLog(data));
+    
+    djangoProc.on('error', (err) => {
+      console.error('Failed to start Django:', err);
+      writeLog(`[Fatal] Failed to start Django: ${err.message}\n`);
+    });
+
+    djangoProc.on('close', (code) => {
+      writeLog(`[Exit] Django server closed with code ${code}\n`);
+    });
+  };
+
+  setupBackend(); // Start backend setup immediately after declaration
+
   // Proxy API requests to Django
-  app.use('/api', createProxyMiddleware({
-    target: 'http://127.0.0.1:8000',
+  app.use(createProxyMiddleware({
+    target: 'http://127.0.0.1:8001',
     changeOrigin: true,
+    pathFilter: '/api',
     on: {
       error: (err, req, res) => {
         console.error('Proxy Error for /api:', err);
         (res as any).status(502).json({ error: 'Backend unreachable', details: (err as any).message });
       },
       proxyReq: (proxyReq, req, res) => {
-        console.log(`Proxying ${req.method} ${req.url} to Django...`);
+        const msg = `Proxying ${req.method} ${req.url} to Django...\n`;
+        console.log(msg);
+        writeLog(msg);
       }
     }
   }));
 
   // Proxy admin requests to Django
-  app.use('/admin', createProxyMiddleware({
-    target: 'http://127.0.0.1:8000',
+  app.use(createProxyMiddleware({
+    target: 'http://127.0.0.1:8001',
     changeOrigin: true,
+    pathFilter: '/admin',
   }));
 
   // Proxy static files (Django)
-  app.use('/static', createProxyMiddleware({
-    target: 'http://127.0.0.1:8000',
+  app.use(createProxyMiddleware({
+    target: 'http://127.0.0.1:8001',
     changeOrigin: true,
+    pathFilter: '/static',
   }));
 
   if (process.env.NODE_ENV !== 'production') {
@@ -127,27 +242,6 @@ async function startServer() {
 
   app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server running at http://localhost:${PORT}`);
-    
-    // Debug: List files
-    console.log('CWD contents:', fs.readdirSync(process.cwd()));
-    if (fs.existsSync(path.join(process.cwd(), 'backend'))) {
-      console.log('Backend contents:', fs.readdirSync(path.join(process.cwd(), 'backend')));
-    }
-    
-    // Setup Backend after proxy is ready
-    console.log('Preparing Python environment...');
-    runDjangoCommand(['-m', 'pip', 'install', '-r', 'backend/requirements.txt'], (pipCode) => {
-      console.log(`Pip install finished with code ${pipCode}`);
-      
-      // Run migrations
-      console.log('Running Django migrations...');
-      runDjangoCommand(['backend/manage.py', 'migrate'], (migrateCode) => {
-        console.log(`Migrations finished with code ${migrateCode}`);
-        
-        console.log('Starting Django development server...');
-        runDjangoCommand(['backend/manage.py', 'runserver', '8000']);
-      });
-    });
   });
 }
 

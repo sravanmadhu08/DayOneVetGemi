@@ -37,5 +37,9 @@ class UserProfileViewSet(viewsets.ModelViewSet):
 class GlobalSettingViewSet(viewsets.ModelViewSet):
     queryset = GlobalSetting.objects.all()
     serializer_class = GlobalSettingSerializer
-    permission_classes = [permissions.IsAuthenticated, IsAdminOrReadOnly]
     lookup_field = 'key'
+
+    def get_permissions(self):
+        if self.action in ['list', 'retrieve']:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated(), IsAdminOrReadOnly()]

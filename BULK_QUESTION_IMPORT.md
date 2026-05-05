@@ -68,3 +68,17 @@ The request must be authenticated as a staff user or a user whose profile has `i
 ```
 
 If any row fails validation, no questions are imported and `errors` includes per-row validation details.
+
+## Upload A Text Or JSON File
+
+You can also upload a `.txt` or `.json` file containing either the raw JSON array or the object format above.
+
+```bash
+curl -X POST http://localhost:3000/api/questions/bulk-import/ \
+  -H "Authorization: Bearer <admin-access-token>" \
+  -F "file=@questions.txt" \
+  -F "dry_run=true" \
+  -F "skip_duplicates=true"
+```
+
+The uploaded file must be UTF-8 text and contain valid JSON.

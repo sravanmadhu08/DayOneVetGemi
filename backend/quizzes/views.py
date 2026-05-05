@@ -1,3 +1,5 @@
+import json
+
 from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -33,14 +35,33 @@ class QuestionViewSet(viewsets.ModelViewSet):
             )
 
         payload = request.data
-        if isinstance(payload, list):
-            rows = payload
+        uploaded_file = request.FILES.get("file")
+        if uploaded_file:
+            try:
+                payload = json.loads(uploaded_file.read().decode("utf-8"))
+            except UnicodeDecodeError:
+                return Response(
+                    {"detail": "Uploaded file must be UTF-8 text."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            except json.JSONDecodeError as exc:
+                return Response(
+                    {"detail": f"Uploaded file must contain valid JSON. {exc.msg} at line {exc.lineno}, column {exc.colno}."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            dry_run = str(request.data.get("dry_run", "false")).lower() in ("1", "true", "yes", "on")
+            skip_duplicates = str(request.data.get("skip_duplicates", "false")).lower() in ("1", "true", "yes", "on")
+        else:
             dry_run = False
             skip_duplicates = False
+
+        if isinstance(payload, list):
+            rows = payload
         elif isinstance(payload, dict):
             rows = payload.get("questions")
-            dry_run = bool(payload.get("dry_run", False))
-            skip_duplicates = bool(payload.get("skip_duplicates", False))
+            if not uploaded_file:
+                dry_run = bool(payload.get("dry_run", False))
+                skip_duplicates = bool(payload.get("skip_duplicates", False))
         else:
             return Response(
                 {"detail": "Expected a JSON array or an object with a questions array."},

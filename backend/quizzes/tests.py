@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from rest_framework.test import APIClient
 
@@ -145,3 +146,37 @@ class BulkQuestionImportTest(TestCase):
         response = self.client.post(self.url, [self.payload()], format="json")
         self.assertEqual(response.status_code, 403)
         self.assertEqual(Question.objects.count(), 0)
+
+    def test_imports_uploaded_json_text_file(self):
+        self.authenticate_admin()
+        upload = SimpleUploadedFile(
+            "questions.txt",
+            b"""[
+              {
+                "text": "Uploaded question?",
+                "species": "cat",
+                "system": "nutrition",
+                "explanation": "Uploaded explanation",
+                "choices": [
+                  { "text": "A", "is_correct": false },
+                  { "text": "B", "is_correct": true }
+                ]
+              }
+            ]""",
+            content_type="text/plain",
+        )
+        response = self.client.post(self.url, {"file": upload}, format="multipart")
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["created_count"], 1)
+        self.assertEqual(Question.objects.get().question_text, "Uploaded question?")
+
+    def test_rejects_uploaded_file_with_invalid_json(self):
+        self.authenticate_admin()
+        upload = SimpleUploadedFile(
+            "questions.txt",
+            b"{not valid json",
+            content_type="text/plain",
+        )
+        response = self.client.post(self.url, {"file": upload}, format="multipart")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("valid JSON", response.data["detail"])

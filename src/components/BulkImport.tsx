@@ -1,20 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import mammoth from 'mammoth';
 import { motion, AnimatePresence } from 'motion/react';
-import { parseQuestionsFromText } from '../services/geminiService';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { collection, doc, writeBatch, getDocs } from 'firebase/firestore';
+import { api } from '../lib/api';
 import { useAuth } from '../hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Upload, FileText, CheckCircle2, AlertCircle, Loader2, Sparkles, Database, Command, FileUp } from 'lucide-react';
+import { Upload, FileText, AlertCircle, Loader2, Sparkles, Database, Command, FileUp } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { Progress } from '@/components/ui/progress';
 
 export function BulkImport() {
-  const { user, profile } = useAuth();
+  const { profile } = useAuth();
   const [file, setFile] = useState<File | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState<string>('');
@@ -25,10 +22,10 @@ export function BulkImport() {
   useEffect(() => {
     const fetchPdfs = async () => {
       try {
-        const snap = await getDocs(collection(db, 'pdfs'));
-        setPdfs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+        const data = await api.getDocuments();
+        setPdfs(data);
       } catch (err) {
-        console.error("Failed to fetch PDFs for bulk import context");
+        console.error("Failed to fetch documents for bulk import context");
       }
     };
     fetchPdfs();
@@ -42,39 +39,17 @@ export function BulkImport() {
   };
 
   const processFile = async () => {
-    if (!file || !user) return;
+    if (!file) return;
 
     setLoading(true);
-    setStatus('Extracting telemetry from document...');
-    setProgress(20);
+    setStatus('Uploading and parsing document via AI...');
+    setProgress(30);
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const result = await mammoth.extractRawText({ arrayBuffer });
-      const text = result.value;
-
-      setStatus('Neural Engine is structuring datasets...');
-      setProgress(50);
+      const questions = await api.parseQuestionsFromDocx(file, selectedSourceId);
       
-      const questions = await parseQuestionsFromText(text);
-      
-      setStatus(`Importing ${questions.length} tactical units to library...`);
-      setProgress(80);
-
-      const batch = writeBatch(db);
-      const path = 'questions';
-
-      questions.forEach((q) => {
-        const newDocRef = doc(collection(db, path));
-        batch.set(newDocRef, {
-          ...q,
-          userId: profile?.isAdmin ? null : user.uid,
-          sourceId: selectedSourceId !== 'none' ? selectedSourceId : null,
-          createdAt: Date.now()
-        });
-      });
-
-      await batch.commit().catch(err => handleFirestoreError(err, OperationType.WRITE, path));
+      setStatus(`Imported ${questions.length} tactical units to library...`);
+      setProgress(90);
 
       setProgress(100);
       setStatus('Ingestion complete. Metrics updated.');

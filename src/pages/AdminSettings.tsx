@@ -1,10 +1,5 @@
 import { useState, useEffect } from "react";
-import {
-  doc,
-  setDoc,
-  onSnapshot,
-} from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/src/lib/firebase";
+import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/hooks/useAuth";
 import { Navigate, Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -24,11 +19,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { ChevronLeft, Plus, Trash2, LayoutGrid, PawPrint, Database, Settings2, Command, ShieldCheck, Activity } from "lucide-react";
 import { toast } from "sonner";
-import { seedInitialData } from "@/src/lib/seed";
 import { Badge } from "@/components/ui/badge";
 
 export default function AdminSettings() {
-  const { profile } = useAuth();
+  const { profile, globalSettings, updateGlobalSettings } = useAuth();
   const [species, setSpecies] = useState<string[]>([]);
   const [systems, setSystems] = useState<string[]>([]);
   const [newSpecies, setNewSpecies] = useState("");
@@ -37,23 +31,29 @@ export default function AdminSettings() {
   const [seeding, setSeeding] = useState(false);
 
   useEffect(() => {
-    if (!profile?.isAdmin) return;
-
-    const unsub = onSnapshot(doc(db, "settings", "global"), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setSpecies(data.speciesOptions || []);
-        setSystems(data.systemOptions || []);
-      }
+    if (globalSettings) {
+      setSpecies(globalSettings.speciesOptions || []);
+      setSystems(globalSettings.systemOptions || []);
       setLoading(false);
-    });
-
-    return () => unsub();
-  }, [profile]);
+    }
+  }, [globalSettings]);
 
   if (!profile?.isAdmin) {
     return <Navigate to="/" />;
   }
+
+  const updateSettings = async (updatedSpecies: string[], updatedSystems: string[]) => {
+    try {
+      await updateGlobalSettings({
+        speciesOptions: updatedSpecies,
+        systemOptions: updatedSystems
+      });
+      setSpecies(updatedSpecies);
+      setSystems(updatedSystems);
+    } catch (error) {
+       toast.error("Failed to update remote settings");
+    }
+  };
 
   const handleAddSpecies = async () => {
     if (!newSpecies.trim()) return;
@@ -62,29 +62,15 @@ export default function AdminSettings() {
       return;
     }
     const updated = [...species, newSpecies.trim()];
-    try {
-      await setDoc(doc(db, "settings", "global"), { 
-        speciesOptions: updated,
-        systemOptions: systems 
-      }, { merge: true });
-      setNewSpecies("");
-      toast.success("Biological marker injected");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, "settings/global");
-    }
+    await updateSettings(updated, systems);
+    setNewSpecies("");
+    toast.success("Biological marker injected");
   };
 
   const handleDeleteSpecies = async (item: string) => {
     const updated = species.filter(s => s !== item);
-    try {
-      await setDoc(doc(db, "settings", "global"), { 
-        speciesOptions: updated,
-        systemOptions: systems 
-      }, { merge: true });
-      toast.success("Marker purged");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, "settings/global");
-    }
+    await updateSettings(updated, systems);
+    toast.success("Marker purged");
   };
 
   const handleAddSystem = async () => {
@@ -94,36 +80,21 @@ export default function AdminSettings() {
       return;
     }
     const updated = [...systems, newSystem.trim()];
-    try {
-      await setDoc(doc(db, "settings", "global"), { 
-        systemOptions: updated,
-        speciesOptions: species
-      }, { merge: true });
-      setNewSystem("");
-      toast.success("Anatomical system registered");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, "settings/global");
-    }
+    await updateSettings(species, updated);
+    setNewSystem("");
+    toast.success("Anatomical system registered");
   };
 
   const handleDeleteSystem = async (item: string) => {
     const updated = systems.filter(s => s !== item);
-    try {
-      await setDoc(doc(db, "settings", "global"), { 
-        systemOptions: updated,
-        speciesOptions: species
-      }, { merge: true });
-      toast.success("System de-registered");
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, "settings/global");
-    }
+    await updateSettings(species, updated);
+    toast.success("System de-registered");
   };
 
   const handleSeed = async () => {
     setSeeding(true);
     try {
-      await seedInitialData();
-      toast.success("Genesis protocols finished");
+       toast.info("Genesis via backend protocols in development");
     } catch (error) {
       toast.error("Seed interference");
     } finally {

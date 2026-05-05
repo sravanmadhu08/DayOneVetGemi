@@ -29,24 +29,9 @@ import {
   Clock,
   LayoutGrid
 } from 'lucide-react';
-import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { 
-  collection, 
-  addDoc, 
-  updateDoc,
-  deleteDoc,
-  doc,
-  serverTimestamp,
-  onSnapshot,
-  query,
-  where,
-  limit,
-  orderBy
-} from 'firebase/firestore';
-
+import { api } from '@/src/lib/api';
 const FLASHCARD_READ_LIMIT = 500;
 import { calculateNextReview, ReviewQuality } from '@/src/lib/srs';
-import { firebaseService } from '@/src/services/firebaseService';
 import ReactMarkdown from 'react-markdown';
 
 interface Flashcard {
@@ -59,11 +44,12 @@ interface Flashcard {
 }
 
 interface FlashcardProgress {
+  id?: number;
   cardId: string;
   interval: number;
   ease: number;
   nextReview: number;
-  lastReviewed: number;
+  lastReviewed?: number;
   consecutiveCorrect: number;
 }
 
@@ -120,56 +106,42 @@ export default function Flashcards() {
   useEffect(() => {
     if (!user) return;
 
-    const qSystem = query(
-      collection(db, 'flashcards'), 
-      where('userId', 'in', ['system', null]),
-      orderBy("createdAt", "desc"),
-      limit(FLASHCARD_READ_LIMIT)
-    );
-    const qUser = query(
-      collection(db, 'flashcards'), 
-      where('userId', '==', user.uid),
-      orderBy("createdAt", "desc"),
-      limit(FLASHCARD_READ_LIMIT)
-    );
-    
-    let systemCards: Flashcard[] = [];
-    let userCards: Flashcard[] = [];
-    
-    const updateCards = () => setCards([...systemCards, ...userCards]);
-
-    const unsubSystem = onSnapshot(qSystem, (snap) => {
-      systemCards = snap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
-      updateCards();
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'flashcards');
-    });
-
-    const unsubUser = onSnapshot(qUser, (snap) => {
-      userCards = snap.docs.map(d => ({ id: d.id, ...d.data() } as Flashcard));
-      updateCards();
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'flashcards');
-    });
-
-    const unsubProgress = onSnapshot(collection(db, 'users', user.uid, 'flashcardProgress'), (snap) => {
-      const progressData: Record<string, FlashcardProgress> = {};
-      snap.docs.forEach(d => {
-        progressData[d.id] = d.data() as FlashcardProgress;
-      });
-      setProgress(progressData);
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, `users/${user.uid}/flashcardProgress`);
-    });
-
-    return () => {
-      unsubSystem();
-      unsubUser();
-      unsubProgress();
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        const [cardsData, progressData] = await Promise.all([
+          api.getFlashcards(),
+          api.getFlashcardProgress()
+        ]);
+        
+        setCards(cardsData);
+        
+        const progressMap: Record<string, FlashcardProgress> = {};
+        progressData.forEach((p: any) => {
+          progressMap[String(p.flashcard)] = {
+            id: p.id,
+            cardId: String(p.flashcard),
+            interval: p.interval,
+            ease: p.ease,
+            nextReview: new Date(p.next_review).getTime(),
+            lastReviewed: p.last_reviewed ? new Date(p.last_reviewed).getTime() : undefined,
+            consecutiveCorrect: p.consecutive_correct
+          };
+        });
+        setProgress(progressMap);
+      } catch (error) {
+        console.error("Failed to fetch flashcard data:", error);
+        toast.error("Failed to load flashcards");
+      } finally {
+        setLoading(false);
+      }
     };
+
+    fetchData();
   }, [user]);
 
   useEffect(() => {
+    if (loading) return;
     const now = Date.now();
     const due = cards.filter(card => {
       const cardProgress = progress[card.id];
@@ -189,12 +161,10 @@ export default function Flashcards() {
     }
 
     try {
-      await addDoc(collection(db, 'flashcards'), {
+      await api.createFlashcard({
         front: newFront,
         back: newBack,
         deck: newDeck || 'General',
-        userId: user.uid,
-        createdAt: serverTimestamp(),
         tags: [newDeck || 'General']
       });
       setNewFront('');
@@ -202,6 +172,9 @@ export default function Flashcards() {
       setNewDeck('General');
       toast.success('Intelligence asset deployed to library');
       setActiveTab('library');
+      // Refresh list
+      const updatedCards = await api.getFlashcards();
+      setCards(updatedCards);
     } catch (err) {
       toast.error('Deployment failure');
     }
@@ -216,15 +189,36 @@ export default function Flashcards() {
     const nextData = calculateNextReview(quality, currentProgress);
     const nextReviewTime = Date.now() + nextData.interval * 24 * 60 * 60 * 1000;
 
-    const update: FlashcardProgress = {
-      cardId: currentCard.id,
-      ...nextData,
-      nextReview: nextReviewTime,
-      lastReviewed: Date.now()
+    const payload = {
+      flashcard: currentCard.id,
+      interval: nextData.interval,
+      ease: nextData.ease,
+      next_review: new Date(nextReviewTime).toISOString(),
+      consecutive_correct: nextData.consecutiveCorrect
     };
 
     try {
-      await firebaseService.updateFlashcardProgress(user.uid, update);
+      let updatedProg;
+      if (currentProgress && (currentProgress as any).id) {
+        updatedProg = await api.reviewFlashcard((currentProgress as any).id, payload);
+      } else {
+        updatedProg = await api.saveFlashcardProgress(payload);
+      }
+      
+      const mappedProg: FlashcardProgress = {
+        id: updatedProg.id,
+        cardId: String(updatedProg.flashcard),
+        interval: updatedProg.interval,
+        ease: updatedProg.ease,
+        nextReview: new Date(updatedProg.next_review).getTime(),
+        lastReviewed: new Date(updatedProg.last_reviewed).getTime(),
+        consecutiveCorrect: updatedProg.consecutive_correct
+      };
+
+      setProgress(prev => ({
+        ...prev,
+        [currentCard.id]: mappedProg
+      }));
       
       if (currentIndex < studyQueue.length - 1) {
         setIsFlipped(false);

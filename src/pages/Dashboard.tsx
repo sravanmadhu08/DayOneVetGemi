@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/src/hooks/useAuth';
-import { firebaseService } from '@/src/services/firebaseService';
-import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { collection, query, onSnapshot } from 'firebase/firestore';
+import { api } from '@/src/lib/api';
 import { toast } from 'sonner';
 import { StudyModule, Flashcard } from '@/src/types';
 import { DashboardStats } from '@/src/components/dashboard/DashboardStats';
@@ -16,22 +14,33 @@ export default function Dashboard() {
   const [dueCards, setDueCards] = useState<Flashcard[]>([]);
   const [loadingCards, setLoadingCards] = useState(true);
   const [modules, setModules] = useState<StudyModule[]>([]);
+  const [progressData, setProgressData] = useState<Record<string, any>>({});
   
   const fetchDueCards = useCallback(async () => {
     if (!user) return;
     setLoadingCards(true);
     try {
-      const userCards = await firebaseService.getFlashcards(user.uid);
-      const progressDataArr = await firebaseService.getFlashcardProgress(user.uid);
+      const [userCards, progressDataArr] = await Promise.all([
+        api.getFlashcards(),
+        api.getFlashcardProgress()
+      ]);
       
-      const progressData: Record<string, any> = {};
-      progressDataArr.forEach(p => {
-        progressData[p.cardId] = p;
+      const progMap: Record<string, any> = {};
+      progressDataArr.forEach((p: any) => {
+        progMap[String(p.flashcard)] = {
+          id: p.id,
+          cardId: String(p.flashcard),
+          interval: p.interval,
+          ease: p.ease,
+          nextReview: new Date(p.next_review).getTime(),
+          consecutiveCorrect: p.consecutive_correct
+        };
       });
+      setProgressData(progMap);
 
       const now = Date.now();
       const due = userCards.filter(card => {
-        const cardProgress = progressData[card.id];
+        const cardProgress = progMap[card.id];
         return !cardProgress || cardProgress.nextReview <= now;
       });
 
@@ -46,40 +55,43 @@ export default function Dashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Real-time modules subscription
-    const qModules = query(collection(db, 'modules'));
-    const unsubModules = onSnapshot(qModules, (snap) => {
-      setModules(snap.docs.map(d => ({ id: d.id, ...d.data() } as StudyModule)));
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, 'modules');
-    });
+    const fetchModules = async () => {
+      try {
+        const data = await api.getModules();
+        setModules(data);
+      } catch (error) {
+        console.error("Failed to fetch modules:", error);
+      }
+    };
 
+    fetchModules();
     fetchDueCards();
-
-    return () => unsubModules();
   }, [user, fetchDueCards]);
 
   const handleReview = async (cardId: string, success: boolean) => {
     if (!user) return;
 
     try {
-      // Re-fetch current progress just to be accurate
-      const progressDataArr = await firebaseService.getFlashcardProgress(user.uid);
-      const currentProgress = progressDataArr.find(p => p.cardId === cardId) || { interval: 0, ease: 2.5, consecutiveCorrect: 0 };
-      
-      // We map binary success to our SRS qualities: good (success) or again (fail)
+      const currentProgress = progressData[cardId] || { interval: 0, ease: 2.5, consecutiveCorrect: 0 };
       const quality = success ? 'good' : 'again';
       const { calculateNextReview } = await import('@/src/lib/srs');
       const nextData = calculateNextReview(quality, currentProgress as any);
       
-      const nextReview = Date.now() + nextData.interval * 24 * 60 * 60 * 1000;
+      const nextReviewTime = Date.now() + nextData.interval * 24 * 60 * 60 * 1000;
       
-      await firebaseService.updateFlashcardProgress(user.uid, {
-        cardId,
-        ...nextData,
-        nextReview,
-        lastReviewed: Date.now()
-      });
+      const payload = {
+        flashcard: cardId,
+        interval: nextData.interval,
+        ease: nextData.ease,
+        next_review: new Date(nextReviewTime).toISOString(),
+        consecutive_correct: nextData.consecutiveCorrect
+      };
+
+      if (currentProgress.id) {
+        await api.reviewFlashcard(currentProgress.id, payload);
+      } else {
+        await api.saveFlashcardProgress(payload);
+      }
 
       setDueCards(prev => prev.filter(c => c.id !== cardId));
       toast.success(success ? "Concept Mastered" : "Scheduled For Review");

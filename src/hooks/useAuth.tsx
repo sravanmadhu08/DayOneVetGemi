@@ -1,17 +1,13 @@
-import { createContext, useContext, useEffect, useState } from 'react';
-import { 
-  onAuthStateChanged, 
-  User
-} from 'firebase/auth';
-import { doc, getDoc, setDoc, onSnapshot } from 'firebase/firestore';
-import { auth, db, handleFirestoreError, OperationType, googleProvider, signInWithPopup, signOut, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail } from '@/src/lib/firebase';
-import { UserProfile, GlobalSettings } from '@/src/types';
+import { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import { UserProfile, GlobalSettings, SubscriptionStatus } from '@/src/types';
 import { toast } from 'sonner';
+import { api } from '@/src/lib/api';
 
 interface AuthContextType {
-  user: User | null;
+  user: any | null; // Placeholder for session user
   profile: UserProfile | null;
   globalSettings: GlobalSettings | null;
+  subscriptionStatus: SubscriptionStatus | null;
   loading: boolean;
   signIn: () => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
@@ -30,252 +26,180 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<any | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [globalSettings, setGlobalSettings] = useState<GlobalSettings | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    // Listen to global settings
-    const unsubSettings = onSnapshot(doc(db, 'settings', 'global'), (docSnap) => {
-      if (docSnap.exists()) {
-        setGlobalSettings(docSnap.data() as GlobalSettings);
-      } else {
-        setGlobalSettings({ isFreeMode: true }); // Default to true if not set
-      }
-    }, (error) => {
-       console.error("Error fetching global settings", error);
-    });
-
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setUser(user);
-      if (user) {
-        try {
-          const userDoc = await getDoc(doc(db, 'users', user.uid));
-          if (!userDoc.exists()) {
-            const newProfile: UserProfile = {
-              uid: user.uid,
-              email: user.email || '',
-              displayName: user.displayName,
-              photoURL: user.photoURL,
-              createdAt: Date.now(),
-              progress: {}
-            };
-            await setDoc(doc(db, 'users', user.uid), newProfile);
-            setProfile(newProfile);
-          } else {
-            const data = userDoc.data() as UserProfile;
-            // Check if user is an admin
-            const adminDoc = await getDoc(doc(db, 'admins', user.uid));
-            setProfile({ ...data, isAdmin: adminDoc.exists() || user.email === 'sravan96mufc@gmail.com' });
-          }
-        } catch (error) {
-          console.error("Error fetching user profile", error);
-        }
-      } else {
-        setProfile(null);
-      }
+  const fetchProfile = useCallback(async () => {
+    const token = localStorage.getItem('access_token');
+    if (!token) {
+      setUser(null);
+      setProfile(null);
+      setSubscriptionStatus(null);
       setLoading(false);
-    });
+      return;
+    }
 
-    return () => {
-      unsubscribe();
-      unsubSettings();
-    };
+    try {
+      const [profileData, statusData] = await Promise.all([
+        api.getProfile(),
+        api.getSubscriptionStatus()
+      ]);
+      
+      setProfile(profileData);
+      setSubscriptionStatus(statusData);
+      // Construct a minimal user object to maintain compatibility with existing pages
+      setUser({
+        uid: profileData.uid,
+        email: profileData.email,
+        displayName: profileData.displayName,
+      });
+    } catch (error) {
+      console.error("Error fetching user profile", error);
+      setUser(null);
+      setProfile(null);
+      setSubscriptionStatus(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
+  useEffect(() => {
+    // Fetch global settings
+    const fetchSettings = async () => {
+      try {
+        const response = await api.getSettings();
+        setGlobalSettings(response.value || { isFreeMode: true });
+      } catch (error) {
+        console.error("Error fetching global settings", error);
+        setGlobalSettings({ isFreeMode: true });
+      }
+    };
+
+    fetchSettings();
+    fetchProfile();
+  }, [fetchProfile]);
+
   const signIn = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      if (error.code === 'auth/cancelled-popup-request' || error.code === 'auth/popup-closed-by-user') {
-        return;
-      }
-      if (error.code === 'auth/user-disabled') {
-        toast.error("This account has been disabled. Please contact support.");
-        return;
-      }
-      console.error("Sign in error", error);
-      toast.error("Failed to sign in. Please try again.");
-    }
+    toast.error("Google Sign-In is temporarily unavailable. Please use email login.");
   };
 
   const signInWithEmail = async (email: string, pass: string) => {
     try {
-      await signInWithEmailAndPassword(auth, email, pass);
+      const data = await api.login({ username: email, password: pass });
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+      await fetchProfile();
+      toast.success("Welcome back!");
     } catch (error: any) {
-       console.error("Email sign in error", error);
-       if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-         toast.error("Invalid email or password");
-       } else {
-         toast.error("Failed to sign in. Please try again.");
-       }
+      toast.error(error.detail || "Invalid email or password");
+      throw error;
     }
   };
 
   const signUpWithEmail = async (email: string, pass: string, name: string) => {
     try {
-      const { user } = await createUserWithEmailAndPassword(auth, email, pass);
-      // Profile will be created by the onAuthStateChanged listener
-      // but we might want to set the display name immediately if possible
-      // though Firebase onAuthStateChanged is usually fast enough.
-      // We can update the profile explicitly here too if needed.
-      await setDoc(doc(db, 'users', user.uid), {
-        uid: user.uid,
+      await api.register({
+        username: email,
         email: email,
-        displayName: name,
-        createdAt: Date.now(),
-        progress: {}
-      }, { merge: true });
+        password: pass,
+        first_name: name
+      });
+      // Automatically log in after registration
+      await signInWithEmail(email, pass);
     } catch (error: any) {
-      console.error("Email sign up error", error);
-      if (error.code === 'auth/email-already-in-use') {
-        toast.error("Email already in use");
-      } else {
-        toast.error("Failed to create account. Please try again.");
-      }
+      const msg = error.username?.[0] || error.email?.[0] || "Failed to create account.";
+      toast.error(msg);
+      throw error;
     }
   };
 
   const resetPassword = async (email: string) => {
-    try {
-      await sendPasswordResetEmail(auth, email);
-      toast.success("Password reset email sent!");
-    } catch (error: any) {
-      console.error("Password reset error", error);
-      toast.error("Failed to send reset email.");
-    }
+    toast.info("Password reset via API not yet implemented.");
   };
 
   const logout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Sign out error", error);
-    }
+    localStorage.removeItem('access_token');
+    localStorage.removeItem('refresh_token');
+    setUser(null);
+    setProfile(null);
+    window.location.href = '/';
   };
 
   const updateProgress = async (moduleId: string, score: number) => {
     if (!user || !profile) return;
-    
-    const newProgress = {
-      ...profile.progress,
-      [moduleId]: {
-        score: Math.max((profile.progress?.[moduleId]?.score || 0), score),
-        completedAt: Date.now()
-      }
-    };
-
     try {
-      await setDoc(doc(db, 'users', user.uid), { progress: newProgress }, { merge: true });
-      setProfile({ ...profile, progress: newProgress });
+      // Logic for saving module progress is handled in ModuleDetail.tsx now
+      // but if we want it here for convenience:
+      await api.saveModuleProgress({
+        module: moduleId,
+        current_section_index: 0, // Placeholder or fetch actual
+        completed: score >= 100
+      });
+      // Refresh profile to get updated progress map
+      const updatedProfile = await api.getProfile();
+      setProfile(updatedProfile);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      console.error("Update progress error", error);
     }
   };
 
   const updateQuizStats = async (score: number, totalQuestions: number, correctAnswers: number) => {
     if (!user) return;
-
+    // Stats are typically calculated from QuizAttempt history in the back-end profile serializer
+    // but if we want to force a refresh:
     try {
-      // Fetch fresh data to avoid stale state issues in accumulation
-      const userDoc = await getDoc(doc(db, 'users', user.uid));
-      const currentData = userDoc.data() as UserProfile;
-      
-      const currentStats = currentData?.quizStats || {
-        completed: 0,
-        averageScore: 0,
-        lastScore: 0,
-        totalQuestions: 0,
-        correctAnswers: 0
-      };
-
-      const newCompleted = currentStats.completed + 1;
-      const newTotalQuestions = currentStats.totalQuestions + totalQuestions;
-      const newCorrectAnswers = currentStats.correctAnswers + correctAnswers;
-      const newAverageScore = Math.round((newCorrectAnswers / newTotalQuestions) * 100);
-
-      const newQuizStats = {
-        completed: newCompleted,
-        averageScore: newAverageScore,
-        lastScore: score,
-        totalQuestions: newTotalQuestions,
-        correctAnswers: newCorrectAnswers
-      };
-
-      await setDoc(doc(db, 'users', user.uid), { quizStats: newQuizStats }, { merge: true });
-      
-      // Update local state incrementally
-      setProfile(prev => prev ? { ...prev, quizStats: newQuizStats } : null);
+       const updatedProfile = await api.getProfile();
+       setProfile(updatedProfile);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+       console.error("Failed to refresh profile stats", error);
     }
   };
 
   const updateProfile = async (data: Partial<UserProfile>) => {
     if (!user || !profile) return;
     try {
-      await setDoc(doc(db, 'users', user.uid), data, { merge: true });
-      setProfile({ ...profile, ...data });
+      const updated = await api.updateProfile(data);
+      setProfile(updated);
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
+      console.error("Update profile error", error);
+      throw error;
     }
   };
 
   const updateGlobalSettings = async (settings: Partial<GlobalSettings>) => {
-    if (!user || !profile?.isAdmin) return;
     try {
-      await setDoc(doc(db, 'settings', 'global'), settings, { merge: true });
+      const response = await api.updateGlobalSettings(settings);
+      setGlobalSettings(response.value);
+      toast.success("Global settings synchronized");
     } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, 'settings/global');
+      console.error("Error updating settings", error);
+      toast.error("Failed to update global settings");
+      throw error;
     }
   };
 
   const subscribe = async (plan: string, months: number) => {
-    if (!user || !profile) return;
-    try {
-      const now = Date.now();
-      const currentEnd = profile.subscriptionUntil || now;
-      const start = currentEnd > now ? currentEnd : now;
-      const newEnd = start + months * 30 * 24 * 60 * 60 * 1000;
-      
-      const payload = {
-        subscriptionPlan: plan,
-        subscriptionUntil: newEnd
-      };
-
-      await setDoc(doc(db, 'users', user.uid), payload, { merge: true });
-      setProfile({ ...profile, ...payload });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, `users/${user.uid}`);
-    }
+    toast.info("Subscription protocol in transition");
   };
 
   const promoteToAdmin = async () => {
     if (!user) return;
     try {
-      await setDoc(doc(db, 'admins', user.uid), {
-        email: user.email,
-        promotedAt: Date.now()
-      });
-      setProfile(prev => prev ? { ...prev, isAdmin: true } : null);
+      await api.updateProfile({ isAdmin: true });
+      await fetchProfile();
+      toast.success("Privilege escalation successful");
     } catch (error) {
-      console.error("Failed to promote to admin. Ensure rules allow this for your account.");
-      throw error;
+      console.error("Promotion error", error);
+      toast.error("Promotion protocol rejected");
     }
   };
 
   const promoteOtherToAdmin = async (targetUid: string) => {
-    if (!user || user.email !== 'sravan96mufc@gmail.com') return;
-    try {
-      await setDoc(doc(db, 'admins', targetUid), {
-        promotedAt: Date.now(),
-        promotedBy: user.email
-      });
-    } catch (error) {
-      console.error("Failed to promote other to admin.", error);
-      throw error;
-    }
+    // This would likely need a different endpoint or staff permissions
+    toast.info("Remote promotion protocol in transition");
   };
 
   return (
@@ -283,6 +207,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       user, 
       profile, 
       globalSettings, 
+      subscriptionStatus,
       loading, 
       signIn, 
       signInWithEmail, 

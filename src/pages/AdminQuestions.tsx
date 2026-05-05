@@ -1,20 +1,8 @@
-import { useState, useEffect } from "react";
-import {
-  collection,
-  query,
-  onSnapshot,
-  doc,
-  deleteDoc,
-  updateDoc,
-  addDoc,
-  serverTimestamp,
-  where,
-  writeBatch,
-} from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/src/lib/firebase";
+import { useState, useEffect, useCallback } from "react";
+import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -26,7 +14,7 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit2, ChevronLeft, Upload, Sparkles, Loader2, Database, Search, Filter, LayoutList } from "lucide-react";
+import { Plus, Trash2, Edit2, ChevronLeft, Upload, Sparkles, Loader2, Database, Search, LayoutList, Filter } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   AlertDialog,
@@ -46,16 +34,14 @@ import { toast } from "sonner";
 import { DEFAULT_QUESTIONS } from "@/src/constants";
 
 export default function AdminQuestions() {
-  const { profile } = useAuth();
+  const { profile, globalSettings } = useAuth();
   const [questions, setQuestions] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-
-  const [speciesOptions, setSpeciesOptions] = useState<string[]>([]);
-  const [systemOptions, setSystemOptions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     question: "",
@@ -66,30 +52,27 @@ export default function AdminQuestions() {
     system: "",
   });
 
+  const fetchQuestions = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await api.getQuestions();
+      setQuestions(data);
+    } catch (error) {
+      console.error("Failed to fetch questions", error);
+      toast.error("Failed to load questions");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!profile?.isAdmin) return;
+    if (profile?.isAdmin) {
+      fetchQuestions();
+    }
+  }, [profile, fetchQuestions]);
 
-    const settingsUnsub = onSnapshot(doc(db, "settings", "global"), (snap) => {
-      if (snap.exists()) {
-        const data = snap.data();
-        setSpeciesOptions(data.speciesOptions || []);
-        setSystemOptions(data.systemOptions || []);
-      }
-    });
-
-    const q = query(collection(db, "questions"), where("userId", "==", null));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setQuestions(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      },
-      (error) => handleFirestoreError(error, OperationType.LIST, "questions"),
-    );
-    return () => {
-      unsub();
-      settingsUnsub();
-    };
-  }, [profile]);
+  const speciesOptions = globalSettings?.speciesOptions || [];
+  const systemOptions = globalSettings?.systemOptions || [];
 
   if (!profile?.isAdmin) {
     return <Navigate to="/" />;
@@ -98,16 +81,13 @@ export default function AdminQuestions() {
   const handleSeedQuestions = async () => {
     setIsSeeding(true);
     try {
-      const batch = writeBatch(db);
       for (const q of DEFAULT_QUESTIONS) {
-        const newDoc = doc(collection(db, "questions"));
-        batch.set(newDoc, {
+        await api.createQuestion({
           ...q,
-          createdAt: Date.now()
         });
       }
-      await batch.commit();
       toast.success("Defaults Seeded");
+      fetchQuestions();
     } catch (err) {
       toast.error("Seeding Failed");
     } finally {
@@ -128,14 +108,10 @@ export default function AdminQuestions() {
       };
 
       if (editingQuestion) {
-        await updateDoc(doc(db, "questions", editingQuestion.id), payload);
+        await api.updateQuestion(editingQuestion.id, payload);
         toast.success("Question Updated");
       } else {
-        await addDoc(collection(db, "questions"), {
-          ...payload,
-          userId: null,
-          createdAt: serverTimestamp(),
-        });
+        await api.createQuestion(payload);
         toast.success("Question Added to Pool");
       }
       setIsOpen(false);
@@ -148,12 +124,9 @@ export default function AdminQuestions() {
         species: [],
         system: "",
       });
+      fetchQuestions();
     } catch (error) {
-      handleFirestoreError(
-        error,
-        editingQuestion ? OperationType.UPDATE : OperationType.CREATE,
-        "questions",
-      );
+       toast.error("Operation failed");
     }
   };
 
@@ -170,12 +143,13 @@ export default function AdminQuestions() {
     setIsOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string | number) => {
     try {
-      await deleteDoc(doc(db, "questions", id));
+      await api.deleteQuestion(id);
       toast.success("Question Removed");
+      fetchQuestions();
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, "questions");
+      toast.error("Delete failed");
     }
   };
 

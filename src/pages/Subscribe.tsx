@@ -13,7 +13,7 @@ const PLANS = [
 ];
 
 export default function Subscribe() {
-  const { subscribe, profile } = useAuth();
+  const { subscribe, profile, subscriptionStatus } = useAuth();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
 
@@ -66,17 +66,17 @@ export default function Subscribe() {
                 disabled={loading}
                 onClick={() => handleSubscribe(plan.id, plan.months)}
               >
-                {loading ? 'Processing...' : 'Subscribe'}
+                {loading ? 'Processing...' : (subscriptionStatus?.isActive ? 'Renew' : 'Subscribe')}
               </Button>
             </CardFooter>
           </Card>
         ))}
       </div>
       
-      {profile?.subscriptionUntil && profile.subscriptionUntil > Date.now() && (
+      {subscriptionStatus?.isActive && subscriptionStatus.endDate && (
         <div className="text-center mt-12 p-6 bg-muted/30 rounded-2xl border border-border/50">
            <p className="font-medium text-muted-foreground flex items-center justify-center gap-2">
-              <Lock className="h-4 w-4" /> You already have an active subscription until {new Date(profile.subscriptionUntil).toLocaleDateString()}.
+              <Lock className="h-4 w-4" /> You already have an active subscription until {new Date(subscriptionStatus.endDate).toLocaleDateString()}.
            </p>
         </div>
       )}

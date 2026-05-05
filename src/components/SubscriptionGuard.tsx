@@ -3,7 +3,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/src/hooks/useAuth';
 
 export default function SubscriptionGuard({ children }: { children: React.ReactNode }) {
-  const { user, profile, globalSettings, loading } = useAuth();
+  const { profile, globalSettings, subscriptionStatus, loading } = useAuth();
   const location = useLocation();
 
   if (loading) {
@@ -11,7 +11,8 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
   }
 
   // Allow access if app is in free mode
-  if (globalSettings?.isFreeMode) {
+  // We prefer the backend's knowledge of free mode if available
+  if (subscriptionStatus?.isFreeMode || globalSettings?.isFreeMode) {
     return <>{children}</>;
   }
 
@@ -20,8 +21,8 @@ export default function SubscriptionGuard({ children }: { children: React.ReactN
     return <>{children}</>;
   }
 
-  // Check if subscription is active
-  const hasActiveSubscription = profile?.subscriptionUntil && profile.subscriptionUntil > Date.now();
+  // Check if subscription is active using backend provided status
+  const hasActiveSubscription = subscriptionStatus?.isActive;
 
   if (!hasActiveSubscription) {
     // Prevent infinite redirect

@@ -1,20 +1,68 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Veterinary Medicine Clinical Intelligence Platform
 
-# Run and deploy your AI Studio app
+A high-performance medical preparation platform built with React, Vite, and Django.
 
-This contains everything you need to run your app locally.
+## Architecture
 
-View your app in AI Studio: https://ai.studio/apps/7794ed9d-af9d-4725-935b-c701d3b05383
+- **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + Framer Motion
+- **Backend**: Django + Django REST Framework (DRF)
+- **Intelligence Layer**: Google Gemini API (Long-context medical document parsing)
+- **Database**: PostgreSQL (Production) / SQLite (Development)
 
-## Run Locally
+## Getting Started
 
-**Prerequisites:**  Node.js
+### Backend Setup
 
+1. Navigate to the `backend` directory:
+   ```bash
+   cd backend
+   ```
+2. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Set up environment variables in `backend/.env`:
+   ```bash
+   GEMINI_API_KEY=your_gemini_api_key
+   SECRET_KEY=your_django_secret_key
+   ```
+4. Run migrations:
+   ```bash
+   python manage.py migrate
+   ```
+5. Start development server:
+   ```bash
+   python manage.py runserver
+   ```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### Frontend Setup
+
+1. Install dependencies from the root directory:
+   ```bash
+   npm install
+   ```
+2. Set up environment variables in `.env`:
+   ```bash
+   VITE_API_BASE_URL=http://localhost:8000/api
+   ```
+3. Start Vite dev server:
+   ```bash
+   npm run dev
+   ```
+
+## Key Features
+
+- **Clinical Dataset Ingestion**: Bulk import medical documents (.docx) via Gemini AI.
+- **Adaptive Quiz Engine**: Personalized clinical scenario testing.
+- **Neural Flashcards**: Spaced-repetition learning for medical facts.
+- **Global Strategy Hub**: Centralized clinical guidelines and resources.
+- **Subscription Lifecycle**: Backend-controlled pro access and synchronization.
+
+## Verification
+
+### Frontend
+- Build: `npm run build`
+- Typecheck: `npm run lint`
+
+### Backend
+- Tests: `python manage.py test`

@@ -19,14 +19,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { PomodoroTimer } from '@/src/components/PomodoroTimer';
 import { Progress } from '@/components/ui/progress';
 import { StudyModule } from '@/src/types';
-import { 
-  doc, 
-  getDoc, 
-  setDoc, 
-  serverTimestamp,
-  onSnapshot
-} from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
+import { api } from '@/src/lib/api';
 import { toast } from 'sonner';
 
 export default function ModuleDetail() {
@@ -37,6 +30,7 @@ export default function ModuleDetail() {
   const [isLoadingProgress, setIsLoadingProgress] = useState(true);
   const [module, setModule] = useState<StudyModule | null>(null);
   const [isLoadingModule, setIsLoadingModule] = useState(true);
+  const [progressId, setProgressId] = useState<number | null>(null);
 
   useEffect(() => {
     if (!moduleId) return;
@@ -44,21 +38,12 @@ export default function ModuleDetail() {
     const fetchModule = async () => {
       try {
         setIsLoadingModule(true);
-
-        const moduleRef = doc(db, "modules", moduleId);
-        const moduleSnap = await getDoc(moduleRef);
-
-        if (!moduleSnap.exists()) {
-          setModule(null);
-          return;
-        }
-
-        setModule({
-          id: moduleSnap.id,
-          ...moduleSnap.data(),
-        } as StudyModule);
+        const data = await api.getModule(moduleId);
+        setModule(data);
       } catch (error) {
-        handleFirestoreError(error, OperationType.READ, "modules");
+        console.error("Failed to fetch module:", error);
+        toast.error("Module not found");
+        setModule(null);
       } finally {
         setIsLoadingModule(false);
       }
@@ -90,11 +75,12 @@ export default function ModuleDetail() {
       if (!user || !moduleId) return;
       
       try {
-        const progressDoc = await getDoc(doc(db, 'users', user.uid, 'moduleProgress', moduleId));
-        if (progressDoc.exists()) {
-          const data = progressDoc.data();
-          if (data.currentSection !== undefined) {
-            setCurrentSection(data.currentSection);
+        const data = await api.getModuleProgress(moduleId);
+        if (data && data.length > 0) {
+          const progress = data[0];
+          setProgressId(progress.id);
+          if (progress.current_section_index !== undefined) {
+            setCurrentSection(progress.current_section_index);
             toast.info("Resuming from your last session");
           }
         }
@@ -112,23 +98,27 @@ export default function ModuleDetail() {
     if (!user || !moduleId) return;
     
     const isLast = sectionIndex === sections.length - 1;
-    const progressRef = doc(db, 'users', user.uid, 'moduleProgress', moduleId);
     
     try {
-      await setDoc(progressRef, {
-        moduleId,
-        currentSection: sectionIndex,
-        totalSections: sections.length,
-        completed: isLast,
-        lastReadAt: serverTimestamp(),
-        ...(isLast ? { completedAt: serverTimestamp() } : {})
-      }, { merge: true });
+      if (progressId) {
+        await api.updateModuleProgress(progressId, {
+          current_section_index: sectionIndex,
+          completed: isLast
+        });
+      } else {
+        const newProgress = await api.saveModuleProgress({
+          module: moduleId,
+          current_section_index: sectionIndex,
+          completed: isLast
+        });
+        setProgressId(newProgress.id);
+      }
 
       if (isLast) {
-        updateProgress(moduleId, 100);
+        updateProgress(String(moduleId), 100);
       }
     } catch (err) {
-      handleFirestoreError(err, OperationType.WRITE, progressRef.path);
+      console.error("Failed to save progress:", err);
     }
   };
 

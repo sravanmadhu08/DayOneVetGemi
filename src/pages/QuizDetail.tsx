@@ -8,9 +8,8 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { CheckCircle2, XCircle, ChevronRight, GraduationCap, AlertCircle, TrendingUp, Timer as TimerIcon, Stethoscope } from 'lucide-react';
 import { toast } from 'sonner';
-import { QuizSession, Question } from '@/src/types';
-import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
-import { collection, doc, setDoc, serverTimestamp, getDoc } from 'firebase/firestore';
+import { QuizSession, Question as QuestionType } from '@/src/types';
+import { api } from '@/src/lib/api';
 import { FileText, ExternalLink } from 'lucide-react';
 import {
   AlertDialog,
@@ -81,20 +80,18 @@ export default function QuizDetail() {
       const finalPercentage = Math.round((score / session.questions.length) * 100);
       updateQuizStats(finalPercentage, session.questions.length, score);
       
-      // Save to history
+      // Save to history (Django API)
       if (user) {
-        const path = `users/${user.uid}/quizHistory`;
-        const newDocRef = doc(collection(db, 'users', user.uid, 'quizHistory'));
-        setDoc(newDocRef, {
+        api.submitQuizAttempt({
           score: finalPercentage,
-          total: session.questions.length,
-          correct: score,
-          timestamp: serverTimestamp(),
-          config: session.config,
-          system: session.config.system,
-          species: session.config.species
+          total_questions: session.questions.length,
+          correct_count: score,
+          system: String(session.config.system),
+          species: String(session.config.species),
+          quiz_config: session.config
         }).catch(err => {
-          handleFirestoreError(err, OperationType.WRITE, `${path}/${newDocRef.id}`);
+          console.error("Failed to save quiz attempt:", err);
+          toast.error("Failed to save quiz results to your history");
         });
       }
       
@@ -143,11 +140,12 @@ export default function QuizDetail() {
   useEffect(() => {
     const fetchSourcePdf = async () => {
       if (session && session.questions[currentStep]?.sourceId) {
-        const id = session.questions[currentStep].sourceId;
-        const snap = await getDoc(doc(db, 'pdfs', id!));
-        if (snap.exists()) {
-          setSourcePdf({ id: snap.id, ...snap.data() });
-        } else {
+        try {
+          const id = session.questions[currentStep].sourceId;
+          const data = await api.getDocument(id!);
+          setSourcePdf(data);
+        } catch (err) {
+          console.error("Failed to fetch source PDF:", err);
           setSourcePdf(null);
         }
       } else {
@@ -196,22 +194,31 @@ export default function QuizDetail() {
     }
 
     if (!answeredState[currentStep]) {
-      if (selectedOption === currentQuestion!.correctAnswer) {
+      const isCorrect = selectedOption === currentQuestion!.correctAnswer;
+      if (isCorrect) {
         setScore(score + 1);
         toast.success("Correct!");
 
-        // Save correctly answered practice question
+        // Save correctly answered practice question (Django API)
         if (!session?.config.isTimed && user && currentQuestion!.id) {
-          const completedPath = `users/${user.uid}/completedPracticeQuestions/${currentQuestion!.id}`;
-          setDoc(doc(db, 'users', user.uid, 'completedPracticeQuestions', currentQuestion!.id), {
-            questionId: currentQuestion!.id,
-            completedAt: serverTimestamp()
+          api.saveCompletedPracticeQuestion({
+            question: currentQuestion!.id,
+            was_correct: true
           }).catch(err => {
-            handleFirestoreError(err, OperationType.WRITE, completedPath);
+            console.error("Failed to save practice question completion:", err);
           });
         }
       } else {
         toast.error("Incorrect choice.");
+        // Optional: save incorrect attempts too
+        if (!session?.config.isTimed && user && currentQuestion!.id) {
+          api.saveCompletedPracticeQuestion({
+            question: currentQuestion!.id,
+            was_correct: false
+          }).catch(err => {
+            console.error("Failed to save practice question completion:", err);
+          });
+        }
       }
     }
     setIsAnswered(true);

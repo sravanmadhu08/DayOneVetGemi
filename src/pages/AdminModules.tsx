@@ -1,19 +1,8 @@
-import { useState, useEffect } from "react";
-import {
-  collection,
-  query,
-  onSnapshot,
-  doc,
-  deleteDoc,
-  updateDoc,
-  addDoc,
-  serverTimestamp,
-  writeBatch,
-} from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/src/lib/firebase";
+import { useState, useEffect, useCallback } from "react";
+import { api } from "@/src/lib/api";
 import { useAuth } from "@/src/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -25,7 +14,7 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit2, ChevronLeft, Sparkles, Loader2, Database, LayoutGrid, List } from "lucide-react";
+import { Plus, Trash2, Edit2, ChevronLeft, Sparkles, Loader2, Database, LayoutGrid } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   AlertDialog,
@@ -50,12 +39,12 @@ import { Badge } from "@/components/ui/badge";
 import { DEFAULT_MODULES } from "@/src/constants";
 
 export default function AdminModules() {
-  const { profile } = useAuth();
+  const { profile, globalSettings } = useAuth();
   const [modules, setModules] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
   const [editingModule, setEditingModule] = useState<any | null>(null);
-  const [systemOptions, setSystemOptions] = useState<string[]>([]);
   const [isSeeding, setIsSeeding] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   const [formData, setFormData] = useState({
     title: "",
@@ -64,28 +53,24 @@ export default function AdminModules() {
     order: 0,
   });
 
+  const fetchModules = useCallback(async () => {
+    try {
+      setLoading(true);
+      const data = await api.getModules();
+      setModules(data);
+    } catch (error) {
+      console.error("Failed to fetch modules", error);
+      toast.error("Failed to load modules");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
-    if (!profile?.isAdmin) return;
-
-    const settingsUnsub = onSnapshot(doc(db, "settings", "global"), (snap) => {
-      if (snap.exists()) {
-        setSystemOptions(snap.data().systemOptions || []);
-      }
-    });
-
-    const q = query(collection(db, "modules"));
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setModules(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-      },
-      (error) => handleFirestoreError(error, OperationType.LIST, "modules"),
-    );
-    return () => {
-      unsub();
-      settingsUnsub();
-    };
-  }, [profile]);
+    if (profile?.isAdmin) {
+      fetchModules();
+    }
+  }, [profile, fetchModules]);
 
   if (!profile?.isAdmin) {
     return <Navigate to="/" />;
@@ -94,17 +79,14 @@ export default function AdminModules() {
   const handleSeedModules = async () => {
     setIsSeeding(true);
     try {
-      const batch = writeBatch(db);
       for (const m of DEFAULT_MODULES) {
-        const newDoc = doc(collection(db, "modules"));
-        batch.set(newDoc, {
+        await api.createModule({
           ...m,
-          createdAt: Date.now(),
-          updatedAt: Date.now()
+          order: Number(m.order)
         });
       }
-      await batch.commit();
       toast.success("Defaults Synced");
+      fetchModules();
     } catch (err) {
       toast.error("Sync Failed");
     } finally {
@@ -116,31 +98,24 @@ export default function AdminModules() {
     e.preventDefault();
     try {
       if (editingModule) {
-        await updateDoc(doc(db, "modules", editingModule.id), {
+        await api.updateModule(editingModule.id, {
           ...formData,
-          order: Number(formData.order),
-          updatedAt: serverTimestamp(),
+          order: Number(formData.order)
         });
         toast.success("Module Updated");
       } else {
-        await addDoc(collection(db, "modules"), {
+        await api.createModule({
           ...formData,
-          order: Number(formData.order),
-          sections: [],
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
+          order: Number(formData.order)
         });
         toast.success("New Module Created");
       }
       setIsOpen(false);
       setEditingModule(null);
       setFormData({ title: "", category: "", content: "", order: 0 });
+      fetchModules();
     } catch (error) {
-      handleFirestoreError(
-        error,
-        editingModule ? OperationType.UPDATE : OperationType.CREATE,
-        "modules",
-      );
+      toast.error("Operation failure");
     }
   };
 
@@ -155,27 +130,29 @@ export default function AdminModules() {
     setIsOpen(true);
   };
 
-  const handleDelete = async (id: string) => {
+  const handleDelete = async (id: string | number) => {
     try {
-      await deleteDoc(doc(db, "modules", id));
+      await api.deleteModule(id);
       toast.success("Module Deleted");
+      fetchModules();
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, "modules");
+      toast.error("Delete failed");
     }
   };
 
   const handleDeleteAll = async () => {
     try {
-      const batch = writeBatch(db);
-      modules.forEach((m) => {
-        batch.delete(doc(db, "modules", m.id));
-      });
-      await batch.commit();
+      for (const m of modules) {
+        await api.deleteModule(m.id);
+      }
       toast.success("Database Cleared");
+      fetchModules();
     } catch (error) {
-      handleFirestoreError(error, OperationType.DELETE, "modules");
+      toast.error("Wipe failed");
     }
   };
+
+  const systemOptions = globalSettings?.systemOptions || [];
 
   return (
     <div className="max-w-7xl mx-auto space-y-8">

@@ -42,20 +42,7 @@ import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
-import {
-  collection,
-  getDocs,
-  addDoc,
-  query,
-  where,
-  orderBy,
-  serverTimestamp,
-  deleteDoc,
-  doc,
-  writeBatch,
-  updateDoc,
-} from "firebase/firestore";
-import { db, handleFirestoreError, OperationType } from "@/src/lib/firebase";
+import { api } from "@/src/lib/api";
 import {
   Dialog,
   DialogContent,
@@ -114,26 +101,17 @@ export default function StudyModules() {
     url: "",
   });
 
-  // Fetch Modules from Firestore
+  // Fetch Modules from API
   useEffect(() => {
     if (!user) return;
 
     const fetchModules = async () => {
       try {
-        const qModules = query(
-          collection(db, "modules"),
-          orderBy("order", "asc")
-        );
-
-        const snap = await getDocs(qModules);
-
-        setModules(
-          snap.docs.map(
-            (doc) => ({ id: doc.id, ...doc.data() }) as StudyModule
-          )
-        );
+        const data = await api.getModules();
+        setModules(data);
       } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, "modules");
+        console.error("Failed to fetch modules:", error);
+        toast.error("Failed to load modules");
       }
     };
 
@@ -145,50 +123,18 @@ export default function StudyModules() {
 
     const fetchLibraryData = async () => {
       try {
-        const [pdfSnap, guidelineSnap, resourceSnap] = await Promise.all([
-          getDocs(
-            query(
-              collection(db, "pdfs"),
-              where("userId", "in", [user.uid, "system", null]),
-              orderBy("createdAt", "desc")
-            )
-          ),
-          getDocs(
-            query(
-              collection(db, "guidelines"),
-              orderBy("createdAt", "desc")
-            )
-          ),
-          getDocs(
-            query(
-              collection(db, "resources"),
-              orderBy("order", "asc")
-            )
-          ),
+        const [docsData, guidelinesData, resourcesData] = await Promise.all([
+          api.getDocuments(),
+          api.getGuidelines(),
+          api.getResources(),
         ]);
 
-        setPdfs(
-          pdfSnap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-        );
-
-        setGuidelines(
-          guidelineSnap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-        );
-
-        setResources(
-          resourceSnap.docs.map((doc) => ({
-            id: doc.id,
-            ...doc.data(),
-          }))
-        );
+        setPdfs(docsData);
+        setGuidelines(guidelinesData);
+        setResources(resourcesData);
       } catch (error) {
-        handleFirestoreError(error, OperationType.LIST, "library data");
+        console.error("Failed to fetch library data:", error);
+        toast.error("Failed to load library resources");
       }
     };
 
@@ -199,16 +145,19 @@ export default function StudyModules() {
     const fetchDetailedProgress = async () => {
       if (!user) return;
       try {
-        const snap = await getDocs(
-          collection(db, "users", user.uid, "moduleProgress"),
-        );
+        const data = await api.getModuleProgress();
         const progressMap: Record<string, ModuleProgressData> = {};
-        snap.docs.forEach((doc) => {
-          progressMap[doc.id] = doc.data() as ModuleProgressData;
+        data.forEach((p: any) => {
+          progressMap[p.module] = {
+            moduleId: p.module,
+            currentSection: p.current_section_index,
+            totalSections: 0, // In the new API, we might need a better way to get total sections
+            completed: p.completed,
+          };
         });
         setDetailedProgress(progressMap);
       } catch (err) {
-        handleFirestoreError(err, OperationType.LIST, `users/${user.uid}/moduleProgress`);
+        console.error("Failed to fetch module progress:", err);
       } finally {
         setIsLoading(false);
       }
@@ -235,23 +184,21 @@ export default function StudyModules() {
 
       if (selectedFile) {
         toast.error(
-          "Please upload the PDF somewhere else and paste a direct URL. Storing PDFs inside Firestore can become expensive quickly."
+          "Direct file uploads are handled via the AI Import feature for now. Please provide a URL for static documents."
         );
         setIsUploading(false);
         return;
       } else if (!pdfUrl) {
-        toast.error("Please provide a URL or select a file.");
+        toast.error("Please provide a URL.");
         setIsUploading(false);
         return;
       }
 
-      await addDoc(collection(db, "pdfs"), {
+      await api.createDocument({
         title: pdfTitle,
         author: pdfAuthor || user.displayName || "Contributor",
         url: finalUrl,
-        size: finalSize,
-        userId: user.uid,
-        createdAt: serverTimestamp(),
+        size_str: finalSize,
       });
       toast.success("Document added to library");
       setIsUploadOpen(false);
@@ -259,6 +206,9 @@ export default function StudyModules() {
       setPdfAuthor("");
       setPdfUrl("");
       setSelectedFile(null);
+      // Refresh list
+      const docs = await api.getDocuments();
+      setPdfs(docs);
     } catch (err) {
       console.error("Upload error:", err);
       toast.error("Failed to add PDF");
@@ -300,8 +250,9 @@ export default function StudyModules() {
 
   const handleDeletePdf = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "pdfs", id));
+      await api.deleteDocument(id);
       toast.success("Document removed");
+      setPdfs(pdfs.filter(p => p.id !== id));
     } catch (err) {
       console.error("Delete error:", err);
       toast.error("Failed to remove document");
@@ -311,15 +262,16 @@ export default function StudyModules() {
   const handleSaveGuideline = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const data = {
+        title: guidelineFormData.title,
+        content: guidelineFormData.summary, // Summary mapped to content in new model
+        category: guidelineFormData.author || "General", // Author mapped to category
+      };
+
       if (editingGuideline) {
-        await updateDoc(doc(db, "guidelines", editingGuideline.id), {
-          ...guidelineFormData,
-        });
+        await api.updateGuideline(editingGuideline.id, data);
       } else {
-        await addDoc(collection(db, "guidelines"), {
-          ...guidelineFormData,
-          createdAt: serverTimestamp(),
-        });
+        await api.createGuideline(data);
       }
       toast.success("Guideline saved");
       setIsGuidelineFormOpen(false);
@@ -331,6 +283,9 @@ export default function StudyModules() {
         summary: "",
         url: "",
       });
+      // Refresh
+      const guidelinesArr = await api.getGuidelines();
+      setGuidelines(guidelinesArr);
     } catch (err) {
       console.error(err);
       toast.error("Failed to save guideline");
@@ -339,8 +294,9 @@ export default function StudyModules() {
 
   const handleDeleteGuideline = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "guidelines", id));
+      await api.deleteGuideline(id);
       toast.success("Guideline deleted");
+      setGuidelines(guidelines.filter(g => g.id !== id));
     } catch (err) {
       toast.error("Failed to delete");
     }
@@ -475,9 +431,10 @@ export default function StudyModules() {
                 {activeModules
                   .map((module) => {
                     const prog = detailedProgress[module.id];
+                    const totalSecs = module.sections?.length || 1;
                     const percent = prog
                       ? Math.round(
-                          ((prog.currentSection + 1) / prog.totalSections) *
+                          ((prog.currentSection + 1) / totalSecs) *
                             100,
                         )
                       : 0;
@@ -782,7 +739,7 @@ export default function StudyModules() {
                       )}
                     </div>
                     <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest mt-1">
-                      {pdf.author} • {pdf.size}
+                      {pdf.author} • {pdf.size_str || pdf.size}
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -976,18 +933,18 @@ export default function StudyModules() {
                     <div className="flex flex-col md:flex-row divide-y md:divide-y-0 md:divide-x divide-border">
                       <div className="p-6 md:p-10 md:w-1/3 flex flex-col justify-center gap-4 bg-muted/30">
                         <Badge className="w-fit bg-primary text-primary-foreground font-black uppercase text-[10px] tracking-widest px-3 py-1 rounded-full">
-                          {guide.author || "Guideline"}
+                          {guide.category || guide.author || "Guideline"}
                         </Badge>
                         <h3 className="text-2xl md:text-3xl font-black leading-tight">
                           {guide.title}
                         </h3>
                         <p className="text-sm font-bold text-muted-foreground">
-                          {guide.date}
+                          {guide.date || (guide.created_at && new Date(guide.created_at).getFullYear())}
                         </p>
                       </div>
                       <div className="p-6 md:p-10 flex-1 flex flex-col justify-between gap-6 relative">
                         <p className="text-muted-foreground leading-relaxed break-words">
-                          {guide.summary}
+                          {guide.content || guide.summary}
                         </p>
                         {guide.url && (
                           <a
@@ -1079,7 +1036,7 @@ export default function StudyModules() {
                         variant="outline"
                         className="text-[10px] font-black uppercase tracking-widest border-primary/20 text-primary px-3"
                       >
-                        {res.type || 'Resource'}
+                        {res.resource_type || res.type || 'Resource'}
                       </Badge>
                       <ExternalLink className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors" />
                     </div>

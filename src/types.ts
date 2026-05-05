@@ -3,13 +3,13 @@ export interface UserProfile {
   email: string;
   displayName: string | null;
   photoURL: string | null;
-  createdAt: number;
+  createdAt: string | number;
   isAdmin?: boolean;
   bio?: string;
   specialty?: string;
   institution?: string;
   subscriptionPlan?: string | null;
-  subscriptionUntil?: number | null;
+  subscriptionUntil?: string | number | null;
   progress?: {
     [moduleId: string]: {
       score: number;
@@ -79,5 +79,12 @@ export interface GlobalSettings {
   isFreeMode: boolean;
   speciesOptions?: string[];
   systemOptions?: string[];
+}
+
+export interface SubscriptionStatus {
+  plan: string;
+  isActive: boolean;
+  endDate: string | null;
+  isFreeMode: boolean;
 }
 

@@ -31,16 +31,10 @@ import {
 import { useNavigate, useLocation, Link } from "react-router-dom";
 import { Badge } from "@/components/ui/badge";
 import { motion, AnimatePresence } from "framer-motion";
-import { db, handleFirestoreError, OperationType } from "@/src/lib/firebase";
-import {
-  collection,
-  query,
-  where,
-  getDocs,
-  onSnapshot,
-} from "firebase/firestore";
+import { api } from "@/src/lib/api";
 import { Question } from "@/src/types";
 import { useAuth } from "@/src/hooks/useAuth";
+import { toast } from "sonner";
 
 export default function QuizList() {
   const { user, profile } = useAuth();
@@ -56,78 +50,33 @@ export default function QuizList() {
   const [countSelection, setCountSelection] = useState<string>(
     isTimed ? "60" : "10",
   );
-  const [customQuestions, setCustomQuestions] = useState<Question[]>([]);
-  const [globalQuestions, setGlobalQuestions] = useState<Question[]>([]);
+  const [questions, setQuestions] = useState<Question[]>([]);
   const [completedQuestionIds, setCompletedQuestionIds] = useState<string[]>(
     [],
   );
   const [isHovered, setIsHovered] = useState<string | null>(null);
 
   useEffect(() => {
-    // Global questions (no userId)
-    const qGlobal = query(
-      collection(db, "questions"),
-      where("userId", "==", null),
-    );
-    const unsubGlobal = onSnapshot(qGlobal, (snap) => {
-      setGlobalQuestions(
-        snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question),
-      );
-    }, (error) => {
-      handleFirestoreError(error, OperationType.LIST, "questions");
-    });
-
-    return () => unsubGlobal();
-  }, [user]);
-
-  useEffect(() => {
     if (!user) return;
 
-    const qCustom = query(
-      collection(db, "questions"),
-      where("userId", "==", user.uid)
-    );
-
-    const unsubCustom = onSnapshot(
-      qCustom,
-      (snap) => {
-        setCustomQuestions(
-          snap.docs.map((d) => ({ id: d.id, ...d.data() }) as Question)
-        );
-      },
-      (error) => {
-        handleFirestoreError(error, OperationType.LIST, "questions");
+    const fetchData = async () => {
+      try {
+        const [qs, completed] = await Promise.all([
+          api.getQuestions(),
+          api.getCompletedPracticeQuestions(),
+        ]);
+        setQuestions(qs);
+        setCompletedQuestionIds(completed.map((c) => String(c.question)));
+      } catch (error) {
+        console.error("Failed to fetch quiz data:", error);
+        toast.error("Failed to load quiz questions");
       }
-    );
-
-    const qCompleted = collection(
-      db,
-      "users",
-      user.uid,
-      "completedPracticeQuestions"
-    );
-
-    const unsubCompleted = onSnapshot(
-      qCompleted,
-      (snap) => {
-        setCompletedQuestionIds(snap.docs.map((d) => d.id));
-      },
-      (error) => {
-        handleFirestoreError(
-          error,
-          OperationType.LIST,
-          "completedPracticeQuestions"
-        );
-      }
-    );
-
-    return () => {
-      unsubCustom();
-      unsubCompleted();
     };
+
+    fetchData();
   }, [user]);
 
-  const pool = React.useMemo(() => [...customQuestions, ...globalQuestions], [customQuestions, globalQuestions]);
+  const pool = questions;
 
   const speciesOptions = [
     "All",

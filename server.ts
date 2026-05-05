@@ -122,6 +122,9 @@ async function startServer() {
 
     console.log(`Using python: ${python}`);
     writeLog(`Using python: ${python}\n`);
+
+    // Keep local dev aligned with backend imports and migrations.
+    await execPromise(python, ['-m', 'pip', 'install', '-r', 'backend/requirements.txt']);
     
     // Try to install django globally/user-level if it's not there
     const hasDjango = await execPromise(python, ['-c', 'import django; print(django.get_version())']);

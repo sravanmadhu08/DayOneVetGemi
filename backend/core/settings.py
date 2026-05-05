@@ -101,6 +101,9 @@ WSGI_APPLICATION = 'core.wsgi.application'
 DATABASE_URL = os.getenv('DATABASE_URL')
 if DATABASE_URL:
     import dj_database_url
+    if DATABASE_URL.startswith('sqlite:///') and not DATABASE_URL.startswith('sqlite:////'):
+        sqlite_name = DATABASE_URL.removeprefix('sqlite:///')
+        DATABASE_URL = f"sqlite:///{BASE_DIR / sqlite_name}"
     DATABASES = {
         'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=not DEBUG)
     }

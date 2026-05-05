@@ -4,14 +4,13 @@ from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
-from django.db import transaction
 from .models import Question, QuizAttempt, CompletedPracticeQuestion, BookmarkedQuestion
+from .importers import import_questions, parse_bool
 from .serializers import (
     QuestionSerializer,
     QuizAttemptSerializer,
     CompletedPracticeQuestionSerializer,
     BookmarkedQuestionSerializer,
-    BulkQuestionImportSerializer,
 )
 from core.permissions import IsAdminOrReadOnly, IsOwner
 
@@ -49,8 +48,8 @@ class QuestionViewSet(viewsets.ModelViewSet):
                     {"detail": f"Uploaded file must contain valid JSON. {exc.msg} at line {exc.lineno}, column {exc.colno}."},
                     status=status.HTTP_400_BAD_REQUEST,
                 )
-            dry_run = str(request.data.get("dry_run", "false")).lower() in ("1", "true", "yes", "on")
-            skip_duplicates = str(request.data.get("skip_duplicates", "false")).lower() in ("1", "true", "yes", "on")
+            dry_run = parse_bool(request.data.get("dry_run", False))
+            skip_duplicates = parse_bool(request.data.get("skip_duplicates", False))
         else:
             dry_run = False
             skip_duplicates = False
@@ -74,64 +73,13 @@ class QuestionViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        errors = []
-        question_kwargs = []
-        for index, row in enumerate(rows):
-            serializer = BulkQuestionImportSerializer(data=row)
-            if serializer.is_valid():
-                question_kwargs.append(serializer.to_question_kwargs())
-            else:
-                errors.append({"index": index, "errors": serializer.errors})
-
-        if errors:
-            return Response({
-                "created_count": 0,
-                "skipped_count": 0,
-                "error_count": len(errors),
-                "created_ids": [],
-                "skipped": [],
-                "errors": errors,
-            }, status=status.HTTP_400_BAD_REQUEST)
-
-        skipped = []
-        existing_texts = set()
-        if skip_duplicates and question_kwargs:
-            existing_texts = set(Question.objects.filter(
-                question_text__in=[item["question_text"] for item in question_kwargs]
-            ).values_list("question_text", flat=True))
-
-        to_create = []
-        for index, item in enumerate(question_kwargs):
-            if skip_duplicates and item["question_text"] in existing_texts:
-                skipped.append({
-                    "index": index,
-                    "text": item["question_text"],
-                    "reason": "duplicate question_text",
-                })
-                continue
-            to_create.append(Question(creator=user, **item))
-
-        if dry_run:
-            return Response({
-                "created_count": len(to_create),
-                "skipped_count": len(skipped),
-                "error_count": 0,
-                "created_ids": [],
-                "skipped": skipped,
-                "errors": [],
-            })
-
-        with transaction.atomic():
-            created = Question.objects.bulk_create(to_create)
-
-        return Response({
-            "created_count": len(created),
-            "skipped_count": len(skipped),
-            "error_count": 0,
-            "created_ids": [question.id for question in created],
-            "skipped": skipped,
-            "errors": [],
-        }, status=status.HTTP_201_CREATED)
+        result, response_status = import_questions(
+            rows,
+            user=user,
+            dry_run=dry_run,
+            skip_duplicates=skip_duplicates,
+        )
+        return Response(result, status=response_status)
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])
     def bookmark(self, request, pk=None):

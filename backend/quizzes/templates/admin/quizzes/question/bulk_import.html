@@ -1,0 +1,59 @@
+{% extends "admin/base_site.html" %}
+
+{% block content %}
+  <div id="content-main">
+    <h1>Bulk import quiz questions</h1>
+    <p>Upload a UTF-8 .txt or .json file containing the supported JSON question format.</p>
+
+    <form method="post" enctype="multipart/form-data" novalidate>
+      {% csrf_token %}
+      <fieldset class="module aligned">
+        <div class="form-row">
+          <label for="id_file" class="required">JSON file:</label>
+          <input type="file" name="file" id="id_file" accept=".txt,.json,application/json,text/plain" required>
+        </div>
+        <div class="form-row">
+          <label for="id_dry_run">Dry run:</label>
+          <input type="checkbox" name="dry_run" id="id_dry_run">
+          <div class="help">Validate and preview counts without saving.</div>
+        </div>
+        <div class="form-row">
+          <label for="id_skip_duplicates">Skip duplicates:</label>
+          <input type="checkbox" name="skip_duplicates" id="id_skip_duplicates" checked>
+          <div class="help">Skip rows whose question text already exists.</div>
+        </div>
+      </fieldset>
+
+      <div class="submit-row">
+        <input type="submit" value="Import questions" class="default">
+        <a href="../" class="button cancel-link">Back to questions</a>
+      </div>
+    </form>
+
+    {% if result %}
+      <h2>Result</h2>
+      <table>
+        <tbody>
+          <tr><th>Created</th><td>{{ result.created_count }}</td></tr>
+          <tr><th>Skipped</th><td>{{ result.skipped_count }}</td></tr>
+          <tr><th>Errors</th><td>{{ result.error_count }}</td></tr>
+        </tbody>
+      </table>
+
+      {% if result.created_ids %}
+        <h3>Created IDs</h3>
+        <p>{{ result.created_ids|join:", " }}</p>
+      {% endif %}
+
+      {% if result.skipped %}
+        <h3>Skipped</h3>
+        <pre>{{ result.skipped }}</pre>
+      {% endif %}
+
+      {% if result.errors %}
+        <h3>Errors</h3>
+        <pre>{{ result.errors }}</pre>
+      {% endif %}
+    {% endif %}
+  </div>
+{% endblock %}

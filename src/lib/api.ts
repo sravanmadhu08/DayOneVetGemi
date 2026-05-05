@@ -107,6 +107,15 @@ export const api = {
   saveCompletedPracticeQuestion: (data: { question: number | string; was_correct: boolean }) =>
     handleResponse<any>(apiClient.post('/completed-questions/', data)),
 
+  getBookmarkedQuestions: () =>
+    handleResponse<any[]>(apiClient.get('/bookmarked-questions/')),
+
+  bookmarkQuestion: (id: string | number) =>
+    handleResponse<any>(apiClient.post(`/questions/${id}/bookmark/`)),
+
+  unbookmarkQuestion: (id: string | number) =>
+    handleResponse<void>(apiClient.delete(`/questions/${id}/bookmark/`)),
+
   // Flashcards
   getFlashcards: () => handleResponse<Flashcard[]>(apiClient.get('/flashcards/')),
   

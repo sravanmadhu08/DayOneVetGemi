@@ -70,6 +70,7 @@ export default function StudyModules() {
   const [activeTab, setActiveTab] = useState(location.state?.tab || "modules");
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [detailedProgress, setDetailedProgress] = useState<
     Record<string, ModuleProgressData>
@@ -100,70 +101,54 @@ export default function StudyModules() {
     url: "",
   });
 
-  // Fetch Modules from API
   useEffect(() => {
     if (!user) return;
 
-    const fetchModules = async () => {
+    const fetchInitialData = async () => {
+      setIsLoading(true);
       try {
-        const data = await api.getModules();
-        setModules(data);
-      } catch (error) {
-        console.error("Failed to fetch modules:", error);
-        toast.error("Failed to load modules");
-      }
-    };
+        const [modulesData, progressData, docsData, guidelinesData, resourcesData] =
+          await Promise.all([
+            api.getModules(),
+            api.getModuleProgress(),
+            api.getDocuments(),
+            api.getGuidelines(),
+            api.getResources(),
+          ]);
 
-    fetchModules();
-  }, [user]);
+        const progressMap: Record<string, ModuleProgressData> = {};
+        progressData.forEach((p: any) => {
+          progressMap[String(p.module)] = {
+            moduleId: String(p.module),
+            currentSection: p.current_section_index,
+            totalSections: 0,
+            completed: p.completed,
+          };
+        });
 
-  useEffect(() => {
-    if (!user) return;
-
-    const fetchLibraryData = async () => {
-      try {
-        const [docsData, guidelinesData, resourcesData] = await Promise.all([
-          api.getDocuments(),
-          api.getGuidelines(),
-          api.getResources(),
-        ]);
-
+        setModules(modulesData);
+        setDetailedProgress(progressMap);
         setPdfs(docsData);
         setGuidelines(guidelinesData);
         setResources(resourcesData);
       } catch (error) {
-        console.error("Failed to fetch library data:", error);
-        toast.error("Failed to load library resources");
-      }
-    };
-
-    fetchLibraryData();
-  }, [user]);
-
-  useEffect(() => {
-    const fetchDetailedProgress = async () => {
-      if (!user) return;
-      try {
-        const data = await api.getModuleProgress();
-        const progressMap: Record<string, ModuleProgressData> = {};
-        data.forEach((p: any) => {
-          progressMap[p.module] = {
-            moduleId: p.module,
-            currentSection: p.current_section_index,
-            totalSections: 0, // In the new API, we might need a better way to get total sections
-            completed: p.completed,
-          };
-        });
-        setDetailedProgress(progressMap);
-      } catch (err) {
-        console.error("Failed to fetch module progress:", err);
+        console.error("Failed to fetch study hub data:", error);
+        toast.error("Failed to load study hub data");
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchDetailedProgress();
+    fetchInitialData();
   }, [user]);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 200);
+
+    return () => window.clearTimeout(handle);
+  }, [searchQuery]);
 
   const categories = useMemo(() => {
     return ["All", ...new Set(modules.map((m) => m.category).filter(Boolean))];
@@ -302,7 +287,7 @@ export default function StudyModules() {
   };
 
   const filteredModules = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = debouncedSearchQuery.trim().toLowerCase();
 
     return modules.filter((module) => {
       const matchesSearch =
@@ -316,19 +301,19 @@ export default function StudyModules() {
 
       return matchesSearch && matchesCategory;
     });
-  }, [modules, searchQuery, selectedCategory]);
+  }, [modules, debouncedSearchQuery, selectedCategory]);
 
   const activeModules = useMemo(() => {
     return filteredModules.filter(
-      (m) => profile?.progress?.[m.id]?.score !== 100
+      (m) => detailedProgress[String(m.id)]?.completed !== true
     );
-  }, [filteredModules, profile?.progress]);
+  }, [filteredModules, detailedProgress]);
 
   const masteredModules = useMemo(() => {
     return filteredModules.filter(
-      (m) => profile?.progress?.[m.id]?.score === 100
+      (m) => detailedProgress[String(m.id)]?.completed === true
     );
-  }, [filteredModules, profile?.progress]);
+  }, [filteredModules, detailedProgress]);
 
   return (
     <div className="space-y-8">
@@ -429,11 +414,14 @@ export default function StudyModules() {
               <AnimatePresence mode="popLayout">
                 {activeModules
                   .map((module) => {
-                    const prog = detailedProgress[module.id];
-                    const totalSecs = module.sections?.length || 1;
+                    const prog = detailedProgress[String(module.id)];
+                    const totalSecs = [
+                      module.content,
+                      ...(module.sections || []).map((section) => section.content),
+                    ].filter(Boolean).length || 1;
                     const percent = prog
                       ? Math.round(
-                          ((prog.currentSection + 1) / totalSecs) *
+                          (Math.min(prog.currentSection + 1, totalSecs) / totalSecs) *
                             100,
                         )
                       : 0;

@@ -103,16 +103,6 @@ async function startServer() {
     }
     
     writeLog('[Setup] Proceeding with python search...\n');
-    const venvDir = path.join(__dirname, 'backend', 'venv');
-    if (fs.existsSync(venvDir)) {
-      writeLog(`Cleaning up existing venv at ${venvDir}\n`);
-      try {
-        fs.rmSync(venvDir, { recursive: true, force: true });
-      } catch (e: any) {
-        writeLog(`Failed to clean venv: ${e.message}\n`);
-      }
-    }
-
     const possiblePythons = ['python3', 'python', '/usr/bin/python3', '/usr/bin/python'];
     let python = '';
     
@@ -161,8 +151,8 @@ except Exception as e:
       await execPromise(python, ['-m', 'pip', 'install', '--user', 'django', 'djangorestframework', 'django-cors-headers', 'python-dotenv', 'djangorestframework-simplejwt']);
     }
 
-    // Run migrations
-    await execPromise(python, ['backend/manage.py', 'makemigrations']);
+    // Apply committed migrations only. Generating migrations on every dev launch
+    // can create noisy files and make startup do unexpected work.
     await execPromise(python, ['backend/manage.py', 'migrate']);
     
     // Ensure default settings exist
@@ -180,7 +170,7 @@ except Exception as e:
     // Start server
     console.log('Starting Django server on port 8001...');
     writeLog('--- Starting Django server on port 8001 ---\n');
-    const djangoProc = spawn(python, ['backend/manage.py', 'runserver', '0.0.0.0:8001'], {
+    const djangoProc = spawn(python, ['backend/manage.py', 'runserver', '127.0.0.1:8001'], {
       stdio: ['inherit', 'pipe', 'pipe'],
       env: { ...process.env, PYTHONUNBUFFERED: '1' }
     });
@@ -250,7 +240,7 @@ except Exception as e:
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
+  app.listen(PORT, '127.0.0.1', () => {
     console.log(`Server running at http://localhost:${PORT}`);
   });
 }

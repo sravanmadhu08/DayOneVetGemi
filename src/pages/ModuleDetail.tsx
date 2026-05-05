@@ -24,13 +24,14 @@ import { toast } from 'sonner';
 
 export default function ModuleDetail() {
   const { moduleId } = useParams();
-  const { user, profile, updateProgress } = useAuth();
+  const { user } = useAuth();
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentSection, setCurrentSection] = useState(0);
   const [isLoadingProgress, setIsLoadingProgress] = useState(true);
   const [module, setModule] = useState<StudyModule | null>(null);
   const [isLoadingModule, setIsLoadingModule] = useState(true);
   const [progressId, setProgressId] = useState<number | null>(null);
+  const [isCompleted, setIsCompleted] = useState(false);
 
   useEffect(() => {
     if (!moduleId) return;
@@ -79,6 +80,7 @@ export default function ModuleDetail() {
         if (data && data.length > 0) {
           const progress = data[0];
           setProgressId(progress.id);
+          setIsCompleted(progress.completed === true);
           if (progress.current_section_index !== undefined) {
             setCurrentSection(progress.current_section_index);
             toast.info("Resuming from your last session");
@@ -101,10 +103,11 @@ export default function ModuleDetail() {
     
     try {
       if (progressId) {
-        await api.updateModuleProgress(progressId, {
+        const updatedProgress = await api.updateModuleProgress(progressId, {
           current_section_index: sectionIndex,
           completed: isLast
         });
+        setIsCompleted(updatedProgress.completed === true);
       } else {
         const newProgress = await api.saveModuleProgress({
           module: moduleId,
@@ -112,10 +115,7 @@ export default function ModuleDetail() {
           completed: isLast
         });
         setProgressId(newProgress.id);
-      }
-
-      if (isLast) {
-        updateProgress(String(moduleId), 100);
+        setIsCompleted(newProgress.completed === true);
       }
     } catch (err) {
       console.error("Failed to save progress:", err);
@@ -124,7 +124,6 @@ export default function ModuleDetail() {
 
   if (!module) return <div className="p-8 text-center">Module not found</div>;
 
-  const isCompleted = !!profile?.progress?.[module.id || ''];
   const progressPercentage = Math.round(((currentSection + 1) / sections.length) * 100);
 
   const handleNext = () => {

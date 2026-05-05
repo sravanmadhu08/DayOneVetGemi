@@ -1,63 +1,24 @@
-import React, { useState, useEffect, useCallback } from 'react';
 import { Play, Pause, RotateCcw, Coffee, BookOpen, Timer as TimerIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { motion, AnimatePresence } from 'framer-motion';
-
-type TimerMode = 'work' | 'break';
+import { usePomodoroTimer } from '@/src/hooks/usePomodoroTimer';
 
 interface PomodoroTimerProps {
   variant?: 'default' | 'subtle';
 }
 
 export function PomodoroTimer({ variant = 'default' }: PomodoroTimerProps) {
-  const [mode, setMode] = useState<TimerMode>('work');
-  const [timeLeft, setTimeLeft] = useState(25 * 60);
-  const [isActive, setIsActive] = useState(false);
-
-  const switchMode = useCallback((newMode: TimerMode) => {
-    setMode(newMode);
-    setTimeLeft(newMode === 'work' ? 25 * 60 : 5 * 60);
-    setIsActive(false);
-  }, []);
-
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
-
-    if (isActive && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      // Play sound or notify
-      if (Notification.permission === 'granted') {
-         new Notification(mode === 'work' ? 'Time for a break!' : 'Back to work!');
-      }
-      switchMode(mode === 'work' ? 'break' : 'work');
-    }
-
-    return () => clearInterval(interval);
-  }, [isActive, timeLeft, mode, switchMode]);
-
-  const toggleTimer = () => setIsActive(!isActive);
-  
-  const resetTimer = () => {
-    setIsActive(false);
-    setTimeLeft(mode === 'work' ? 25 * 60 : 5 * 60);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  useEffect(() => {
-    if ("Notification" in window && Notification.permission === "default") {
-      Notification.requestPermission();
-    }
-  }, []);
+  const {
+    mode,
+    timeLeft,
+    isActive,
+    toggleTimer,
+    resetTimer,
+    switchMode,
+    formatTime,
+  } = usePomodoroTimer();
 
   if (variant === 'subtle') {
     return (

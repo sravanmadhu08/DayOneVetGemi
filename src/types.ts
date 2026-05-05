@@ -62,6 +62,7 @@ export interface Question {
   species: string[]; // e.g. ["Canine", "Feline"]
   system: string; // e.g. "Cardiology"
   sourceId?: string; // Reference to a PdfDocument id
+  isBookmarked?: boolean;
 }
 
 export interface QuizSession {

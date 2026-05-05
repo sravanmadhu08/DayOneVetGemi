@@ -1,4 +1,8 @@
 import {
+  Suspense,
+  lazy,
+} from "react";
+import {
   BrowserRouter as Router,
   Routes,
   Route,
@@ -6,30 +10,37 @@ import {
 } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/src/hooks/useAuth";
 import Navbar from "@/src/components/layout/Navbar";
-import Dashboard from "@/src/pages/Dashboard";
-import Flashcards from "@/src/pages/Flashcards";
-import StudyModules from "@/src/pages/StudyModules";
-import ModuleDetail from "@/src/pages/ModuleDetail";
-import QuizList from "@/src/pages/QuizList";
-import QuizDetail from "@/src/pages/QuizDetail";
-import Landing from "@/src/pages/Landing";
-import Profile from "@/src/pages/Profile";
-import Subscribe from "@/src/pages/Subscribe";
-import ProgressTracker from "@/src/pages/ProgressTracker";
-import AdminModules from "@/src/pages/AdminModules";
-import AdminQuestions from "@/src/pages/AdminQuestions";
-import AdminSettings from "@/src/pages/AdminSettings";
 import SubscriptionGuard from "@/src/components/SubscriptionGuard";
 import { Toaster } from "@/components/ui/sonner";
+
+const Dashboard = lazy(() => import("@/src/pages/Dashboard"));
+const Flashcards = lazy(() => import("@/src/pages/Flashcards"));
+const StudyModules = lazy(() => import("@/src/pages/StudyModules"));
+const ModuleDetail = lazy(() => import("@/src/pages/ModuleDetail"));
+const QuizList = lazy(() => import("@/src/pages/QuizList"));
+const QuizDetail = lazy(() => import("@/src/pages/QuizDetail"));
+const Landing = lazy(() => import("@/src/pages/Landing"));
+const Profile = lazy(() => import("@/src/pages/Profile"));
+const Subscribe = lazy(() => import("@/src/pages/Subscribe"));
+const ProgressTracker = lazy(() => import("@/src/pages/ProgressTracker"));
+const AdminModules = lazy(() => import("@/src/pages/AdminModules"));
+const AdminQuestions = lazy(() => import("@/src/pages/AdminQuestions"));
+const AdminSettings = lazy(() => import("@/src/pages/AdminSettings"));
+
+function LoadingScreen() {
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+    </div>
+  );
+}
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading)
     return (
-      <div className="flex h-screen items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
-      </div>
+      <LoadingScreen />
     );
 
   if (!user) return <Navigate to="/welcome" />;
@@ -42,8 +53,9 @@ export default function App() {
     <AuthProvider>
       <Router>
         <div className="min-h-screen bg-background font-sans antialiased flex flex-col">
-          <Routes>
-            <Route path="/welcome" element={<Landing />} />
+          <Suspense fallback={<LoadingScreen />}>
+            <Routes>
+              <Route path="/welcome" element={<Landing />} />
             <Route
               path="/*"
               element={
@@ -92,7 +104,8 @@ export default function App() {
                 </PrivateRoute>
               }
             />
-          </Routes>
+            </Routes>
+          </Suspense>
           <Toaster />
         </div>
       </Router>

@@ -3,18 +3,23 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/src/hooks/useAuth';
 import { api } from '@/src/lib/api';
 import { toast } from 'sonner';
-import { StudyModule, Flashcard } from '@/src/types';
+import { StudyModule, Flashcard, Question } from '@/src/types';
 import { DashboardStats } from '@/src/components/dashboard/DashboardStats';
 import { DashboardFlashcards } from '@/src/components/dashboard/DashboardFlashcards';
 import { RecentModules } from '@/src/components/dashboard/RecentModules';
-import { Activity, Calendar } from 'lucide-react';
+import { Activity, Calendar, Star } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
   const [dueCards, setDueCards] = useState<Flashcard[]>([]);
   const [loadingCards, setLoadingCards] = useState(true);
   const [modules, setModules] = useState<StudyModule[]>([]);
+  const [moduleProgress, setModuleProgress] = useState<Record<string, any>>({});
   const [progressData, setProgressData] = useState<Record<string, any>>({});
+  const [importantQuestions, setImportantQuestions] = useState<Question[]>([]);
   
   const fetchDueCards = useCallback(async () => {
     if (!user) return;
@@ -57,8 +62,16 @@ export default function Dashboard() {
 
     const fetchModules = async () => {
       try {
-        const data = await api.getModules();
-        setModules(data);
+        const [modulesData, progressDataArr] = await Promise.all([
+          api.getModules(),
+          api.getModuleProgress(),
+        ]);
+        const progressMap: Record<string, any> = {};
+        progressDataArr.forEach((progress: any) => {
+          progressMap[String(progress.module)] = progress;
+        });
+        setModules(modulesData);
+        setModuleProgress(progressMap);
       } catch (error) {
         console.error("Failed to fetch modules:", error);
       }
@@ -67,6 +80,24 @@ export default function Dashboard() {
     fetchModules();
     fetchDueCards();
   }, [user, fetchDueCards]);
+
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchImportantQuestions = async () => {
+      try {
+        const bookmarks = await api.getBookmarkedQuestions();
+        setImportantQuestions(bookmarks.map((bookmark: any) => ({
+          ...bookmark.question,
+          isBookmarked: true,
+        })));
+      } catch (error) {
+        console.error("Failed to fetch important questions:", error);
+      }
+    };
+
+    fetchImportantQuestions();
+  }, [user]);
 
   const handleReview = async (cardId: string, success: boolean) => {
     if (!user) return;
@@ -100,8 +131,26 @@ export default function Dashboard() {
     }
   };
 
-  const completedModuleIds = Object.keys(profile?.progress || {});
+  const completedModuleIds = Object.entries(moduleProgress)
+    .filter(([, progress]) => progress.completed === true)
+    .map(([moduleId]) => moduleId);
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+
+  const handleToggleBookmark = async (question: Question) => {
+    try {
+      if (question.isBookmarked) {
+        await api.unbookmarkQuestion(question.id);
+        setImportantQuestions(prev => prev.filter(q => q.id !== question.id));
+        toast.success("Removed from important questions");
+      } else {
+        await api.bookmarkQuestion(question.id);
+        setImportantQuestions(prev => [{ ...question, isBookmarked: true }, ...prev]);
+        toast.success("Marked important");
+      }
+    } catch (error) {
+      toast.error("Could not update bookmark");
+    }
+  };
 
   return (
     <div className="max-w-[1400px] mx-auto space-y-8 pb-20">
@@ -146,6 +195,58 @@ export default function Dashboard() {
       {/* Main Content Areas */}
       <div className="grid gap-6 lg:grid-cols-12 place-items-stretch">
         <div className="lg:col-span-7 xl:col-span-8 flex flex-col gap-6">
+          <Card className="rounded-2xl border-primary/10">
+            <CardHeader className="flex flex-row items-center justify-between gap-4 pb-3">
+              <CardTitle className="text-base font-black tracking-tight flex items-center gap-2">
+                <Star className="h-4 w-4 text-amber-500 fill-amber-500" />
+                Important Questions
+              </CardTitle>
+              <Badge variant="outline" className="rounded-full text-[10px] font-black uppercase tracking-widest">
+                {importantQuestions.length}
+              </Badge>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {importantQuestions.length > 0 ? (
+                importantQuestions.slice(0, 4).map((question) => (
+                  <div key={question.id} className="rounded-xl border bg-background p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="space-y-2 min-w-0">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge variant="secondary" className="text-[9px] font-black uppercase tracking-widest">
+                            {question.system}
+                          </Badge>
+                          {question.species?.slice(0, 2).map((item) => (
+                            <Badge key={item} variant="outline" className="text-[9px]">
+                              {item}
+                            </Badge>
+                          ))}
+                        </div>
+                        <p className="text-sm font-bold leading-relaxed break-words">
+                          {question.question}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-9 w-9 rounded-full text-amber-500 hover:text-amber-600 hover:bg-amber-500/10 shrink-0"
+                        onClick={() => handleToggleBookmark(question)}
+                        aria-label="Remove important question bookmark"
+                      >
+                        <Star className="h-4 w-4 fill-current" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {question.explanation}
+                    </p>
+                  </div>
+                ))
+              ) : (
+                <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+                  Star questions to keep them here for review.
+                </div>
+              )}
+            </CardContent>
+          </Card>
           <RecentModules 
             modules={modules}
             completedModuleIds={completedModuleIds}

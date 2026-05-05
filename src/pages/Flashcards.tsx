@@ -29,9 +29,12 @@ import {
   LayoutGrid
 } from 'lucide-react';
 import { api } from '@/src/lib/api';
-const FLASHCARD_READ_LIMIT = 500;
 import { calculateNextReview, ReviewQuality } from '@/src/lib/srs';
 import ReactMarkdown from 'react-markdown';
+import { sampleShuffled } from '@/src/lib/collections';
+
+const FLASHCARD_LIBRARY_RENDER_LIMIT = 120;
+const MAX_FLASHCARD_TOTAL_CHARS = 200;
 
 interface Flashcard {
   id: string;
@@ -73,10 +76,8 @@ export default function Flashcards() {
   const [newBack, setNewBack] = useState('');
   const [newDeck, setNewDeck] = useState('General');
 
-  const getWordCount = (text: string) => {
-    if (!text.trim()) return 0;
-    return text.trim().split(/\s+/).length;
-  };
+  const combinedCharCount = newFront.trim().length + newBack.trim().length;
+  const isOverFlashcardCharLimit = combinedCharCount > MAX_FLASHCARD_TOTAL_CHARS;
 
   const { filteredCards, groupedDecks, sortedDecks } = useMemo(() => {
     const searchLower = librarySearchQuery.toLowerCase();
@@ -101,6 +102,14 @@ export default function Flashcards() {
     const sorted = Object.keys(grouped).sort();
     return { filteredCards: filtered, groupedDecks: grouped, sortedDecks: sorted };
   }, [cards, librarySearchQuery]);
+
+  const dueCards = useMemo(() => {
+    const now = Date.now();
+    return cards.filter(card => {
+      const cardProgress = progress[card.id];
+      return !cardProgress || cardProgress.nextReview <= now;
+    });
+  }, [cards, progress]);
 
   useEffect(() => {
     if (!user) return;
@@ -140,29 +149,24 @@ export default function Flashcards() {
   }, [user]);
 
   useEffect(() => {
-    if (loading) return;
-    const now = Date.now();
-    const due = cards.filter(card => {
-      const cardProgress = progress[card.id];
-      return !cardProgress || cardProgress.nextReview <= now;
-    });
-    setStudyQueue(due.sort(() => Math.random() - 0.5));
-    setLoading(false);
-  }, [cards, progress]);
+    if (!loading && studyQueue.length === 0 && dueCards.length > 0) {
+      setStudyQueue(sampleShuffled(dueCards));
+    }
+  }, [dueCards, loading, studyQueue.length]);
 
   const handleCreateCard = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!user || !newFront || !newBack) return;
+    if (!user || !newFront.trim() || !newBack.trim()) return;
 
-    if (getWordCount(newFront) > 200 || getWordCount(newBack) > 200) {
-      toast.error('Tactical limits exceeded. Content too verbose.');
+    if (isOverFlashcardCharLimit) {
+      toast.error(`Flashcards must be ${MAX_FLASHCARD_TOTAL_CHARS} characters or fewer across front and back.`);
       return;
     }
 
     try {
       await api.createFlashcard({
-        front: newFront,
-        back: newBack,
+        front: newFront.trim(),
+        back: newBack.trim(),
         deck: newDeck || 'General',
         tags: [newDeck || 'General']
       });
@@ -234,12 +238,7 @@ export default function Flashcards() {
   };
 
   const fetchCards = () => {
-    const now = Date.now();
-    const due = cards.filter(card => {
-      const cardProgress = progress[card.id];
-      return !cardProgress || cardProgress.nextReview <= now;
-    });
-    setStudyQueue(due.sort(() => Math.random() - 0.5));
+    setStudyQueue(sampleShuffled(dueCards));
     setCurrentIndex(0);
     setIsFlipped(false);
     toast.info("Database re-indexed");
@@ -290,7 +289,7 @@ export default function Flashcards() {
              <span className="text-[10px] font-black uppercase tracking-widest text-primary/60 mb-1">Due for Calibration</span>
              <div className="flex items-center gap-2">
                 <Calendar className="h-4 w-4 text-primary" />
-                <span className="text-xl font-black text-primary">{studyQueue.length}</span>
+                 <span className="text-xl font-black text-primary">{dueCards.length}</span>
              </div>
           </div>
         </div>
@@ -459,7 +458,18 @@ export default function Flashcards() {
                 );
               }
 
-              return sortedDecks.map(deck => (
+              let renderedCount = 0;
+
+              return sortedDecks.map(deck => {
+                const visibleCards = groupedDecks[deck].slice(
+                  0,
+                  Math.max(0, FLASHCARD_LIBRARY_RENDER_LIMIT - renderedCount),
+                );
+                renderedCount += visibleCards.length;
+
+                if (visibleCards.length === 0) return null;
+
+                return (
                 <div key={deck} className="space-y-6">
                   <div className="flex items-center justify-between pb-4 border-b border-border/50">
                     <div className="flex items-center gap-4">
@@ -474,7 +484,7 @@ export default function Flashcards() {
                   </div>
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    {groupedDecks[deck].map(card => {
+                    {visibleCards.map(card => {
                       const isCurrentlyFlipped = flippedCardId === card.id;
                       return (
                         <Card 
@@ -512,8 +522,14 @@ export default function Flashcards() {
                     })}
                   </div>
                 </div>
-              ));
+                );
+              });
             })()}
+            {filteredCards.length > FLASHCARD_LIBRARY_RENDER_LIMIT && (
+              <div className="py-8 text-center text-xs font-black uppercase tracking-widest text-muted-foreground">
+                Showing {FLASHCARD_LIBRARY_RENDER_LIMIT} of {filteredCards.length}. Narrow your search to see more.
+              </div>
+            )}
           </div>
         </TabsContent>
 
@@ -533,8 +549,8 @@ export default function Flashcards() {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center px-1">
                         <Label htmlFor="front" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Internal Query (Front)</Label>
-                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${getWordCount(newFront) > 200 ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground/40'}`}>
-                          {getWordCount(newFront)} / 200
+                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${isOverFlashcardCharLimit ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground/40'}`}>
+                          {combinedCharCount} / {MAX_FLASHCARD_TOTAL_CHARS}
                         </span>
                     </div>
                     <Textarea 
@@ -549,8 +565,8 @@ export default function Flashcards() {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center px-1">
                       <Label htmlFor="back" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Procedural Result (Back)</Label>
-                      <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${getWordCount(newBack) > 200 ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground/40'}`}>
-                        {getWordCount(newBack)} / 200
+                      <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${isOverFlashcardCharLimit ? 'bg-red-500/10 text-red-500' : 'bg-muted text-muted-foreground/40'}`}>
+                        {combinedCharCount} / {MAX_FLASHCARD_TOTAL_CHARS}
                       </span>
                     </div>
                     <Textarea 
@@ -579,7 +595,7 @@ export default function Flashcards() {
                    </div>
                 </div>
 
-                <Button type="submit" className="w-full h-18 rounded-3xl text-sm font-black uppercase tracking-widest bg-primary hover:bg-primary/90 shadow-2xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
+                <Button type="submit" disabled={isOverFlashcardCharLimit} className="w-full h-18 rounded-3xl text-sm font-black uppercase tracking-widest bg-primary hover:bg-primary/90 shadow-2xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-[0.98]">
                   <Plus className="h-5 w-5 mr-3" strokeWidth={3} /> Launch Intel Asset
                 </Button>
               </form>

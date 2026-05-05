@@ -35,6 +35,7 @@ import { api } from "@/src/lib/api";
 import { Question } from "@/src/types";
 import { useAuth } from "@/src/hooks/useAuth";
 import { toast } from "sonner";
+import { sampleShuffled } from "@/src/lib/collections";
 
 export default function QuizList() {
   const { user, profile } = useAuth();
@@ -78,22 +79,55 @@ export default function QuizList() {
 
   const pool = questions;
 
-  const speciesOptions = [
-    "All",
-    ...new Set(
-      pool.flatMap(
-        (q) => q.species,
-      ).filter(Boolean),
-    ),
-  ];
-  const systemOptions = [
-    "All",
-    ...new Set(
-      pool.map(
-        (q) => q.system,
-      ).filter(Boolean),
-    ),
-  ];
+  const completedQuestionSet = React.useMemo(
+    () => new Set(completedQuestionIds),
+    [completedQuestionIds],
+  );
+
+  const {
+    speciesOptions,
+    systemOptions,
+    speciesTotalCounts,
+    speciesRemainingCounts,
+    systemTotalCounts,
+    systemRemainingCounts,
+    totalRemainingCount,
+  } = React.useMemo(() => {
+    const speciesTotals = new Map<string, number>();
+    const speciesRemaining = new Map<string, number>();
+    const systemTotals = new Map<string, number>();
+    const systemRemaining = new Map<string, number>();
+    let remaining = 0;
+
+    pool.forEach((q) => {
+      const isRemaining = !completedQuestionSet.has(q.id || "");
+      if (isRemaining) remaining += 1;
+
+      q.species.filter(Boolean).forEach((sp) => {
+        speciesTotals.set(sp, (speciesTotals.get(sp) || 0) + 1);
+        if (isRemaining) {
+          speciesRemaining.set(sp, (speciesRemaining.get(sp) || 0) + 1);
+        }
+      });
+
+      if (q.system) {
+        systemTotals.set(q.system, (systemTotals.get(q.system) || 0) + 1);
+        if (isRemaining) {
+          systemRemaining.set(q.system, (systemRemaining.get(q.system) || 0) + 1);
+        }
+      }
+    });
+
+    return {
+      speciesOptions: ["All", ...Array.from(speciesTotals.keys()).sort()],
+      systemOptions: ["All", ...Array.from(systemTotals.keys()).sort()],
+      speciesTotalCounts: speciesTotals,
+      speciesRemainingCounts: speciesRemaining,
+      systemTotalCounts: systemTotals,
+      systemRemainingCounts: systemRemaining,
+      totalRemainingCount: remaining,
+    };
+  }, [pool, completedQuestionSet]);
 
   const availableQuestions = React.useMemo(() => {
     return pool.filter((q) => {
@@ -101,7 +135,7 @@ export default function QuizList() {
       const systemMatch = system === "All" || q.system === system;
 
       // Filter out completed questions ONLY in practice mode
-      const isCompleted = completedQuestionIds.includes(q.id || "");
+      const isCompleted = completedQuestionSet.has(q.id || "");
 
       if (isTimed) return speciesMatch && systemMatch;
 
@@ -114,7 +148,7 @@ export default function QuizList() {
     species,
     system,
     pool,
-    completedQuestionIds,
+    completedQuestionSet,
     isTimed,
     reviewMode,
   ]);
@@ -128,8 +162,7 @@ export default function QuizList() {
 
   const handleStart = () => {
     const count = getActualCount();
-    const shuffled = [...availableQuestions].sort(() => 0.5 - Math.random());
-    const selected = shuffled.slice(0, count);
+    const selected = sampleShuffled(availableQuestions, count);
 
     sessionStorage.setItem(
       "vet_quiz_session",
@@ -239,18 +272,12 @@ export default function QuizList() {
                       const totalCount =
                         opt === "All"
                           ? pool.length
-                          : pool.filter((q) => q.species.includes(opt)).length;
+                          : speciesTotalCounts.get(opt) || 0;
 
                       const remainingCount =
                         opt === "All"
-                          ? pool.filter(
-                              (q) => !completedQuestionIds.includes(q.id || ""),
-                            ).length
-                          : pool.filter(
-                              (q) =>
-                                q.species.includes(opt) &&
-                                !completedQuestionIds.includes(q.id || ""),
-                            ).length;
+                          ? totalRemainingCount
+                          : speciesRemainingCounts.get(opt) || 0;
 
                       return (
                         <SelectItem
@@ -284,18 +311,12 @@ export default function QuizList() {
                       const totalCount =
                         opt === "All"
                           ? pool.length
-                          : pool.filter((q) => q.system === opt).length;
+                          : systemTotalCounts.get(opt) || 0;
 
                       const remainingCount =
                         opt === "All"
-                          ? pool.filter(
-                              (q) => !completedQuestionIds.includes(q.id || ""),
-                            ).length
-                          : pool.filter(
-                              (q) =>
-                                q.system === opt &&
-                                !completedQuestionIds.includes(q.id || ""),
-                            ).length;
+                          ? totalRemainingCount
+                          : systemRemainingCounts.get(opt) || 0;
 
                       return (
                         <SelectItem

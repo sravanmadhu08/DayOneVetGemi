@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/componen
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, XCircle, ChevronRight, GraduationCap, AlertCircle, TrendingUp, Timer as TimerIcon, Stethoscope } from 'lucide-react';
+import { CheckCircle2, XCircle, ChevronRight, GraduationCap, AlertCircle, TrendingUp, Timer as TimerIcon, Stethoscope, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { QuizSession, Question as QuestionType } from '@/src/types';
 import { api } from '@/src/lib/api';
@@ -172,6 +172,34 @@ export default function QuizDetail() {
   if (!session) return <div className="flex justify-center items-center h-64">Loading session...</div>;
 
   const currentQuestion = session?.questions[currentStep];
+
+  const handleToggleBookmark = async () => {
+    if (!currentQuestion?.id) return;
+
+    try {
+      if (currentQuestion.isBookmarked) {
+        await api.unbookmarkQuestion(currentQuestion.id);
+        toast.success("Removed from important questions");
+      } else {
+        await api.bookmarkQuestion(currentQuestion.id);
+        toast.success("Marked important");
+      }
+
+      setSession(prev => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          questions: prev.questions.map(question =>
+            question.id === currentQuestion.id
+              ? { ...question, isBookmarked: !currentQuestion.isBookmarked }
+              : question
+          ),
+        };
+      });
+    } catch (error) {
+      toast.error("Could not update bookmark");
+    }
+  };
   const progressPercentage = session ? ((currentStep + 1) / session.questions.length) * 100 : 0;
 
   const handleOptionSelect = (index: number) => {
@@ -533,13 +561,24 @@ export default function QuizDetail() {
           <div className="w-full space-y-4">
             <Card className="border-none shadow-2xl bg-background rounded-[32px] overflow-hidden border border-border/30">
               <CardHeader className="bg-muted/30 p-6 lg:p-8 border-b">
-                <CardTitle 
-                  className="text-lg md:text-xl font-semibold leading-relaxed text-foreground select-none"
-                  onContextMenu={(e) => e.preventDefault()}
-                  onDragStart={(e) => e.preventDefault()}
-                >
-                  {currentQuestion.question}
-                </CardTitle>
+                <div className="flex items-start justify-between gap-4">
+                  <CardTitle 
+                    className="text-lg md:text-xl font-semibold leading-relaxed text-foreground select-none"
+                    onContextMenu={(e) => e.preventDefault()}
+                    onDragStart={(e) => e.preventDefault()}
+                  >
+                    {currentQuestion.question}
+                  </CardTitle>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`h-10 w-10 rounded-full shrink-0 ${currentQuestion.isBookmarked ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-500/10' : 'text-muted-foreground hover:text-amber-500 hover:bg-amber-500/10'}`}
+                    onClick={handleToggleBookmark}
+                    aria-label={currentQuestion.isBookmarked ? "Remove important question bookmark" : "Mark question important"}
+                  >
+                    <Star className={`h-5 w-5 ${currentQuestion.isBookmarked ? 'fill-current' : ''}`} />
+                  </Button>
+                </div>
               </CardHeader>
               <CardContent className="p-6 lg:p-8 space-y-6">
                 <div className="grid gap-3">

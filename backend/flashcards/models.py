@@ -1,6 +1,10 @@
 from django.db import models
 from django.contrib.auth.models import User
 
+MAX_CUSTOM_FLASHCARDS_PER_USER = 300
+MAX_FLASHCARD_CHARS = 500
+MAX_FLASHCARD_TOTAL_CHARS = 200
+
 class Flashcard(models.Model):
     front = models.TextField()
     back = models.TextField()
@@ -24,6 +28,9 @@ class FlashcardProgress(models.Model):
 
     class Meta:
         unique_together = ('user', 'flashcard')
+        indexes = [
+            models.Index(fields=['user', 'next_review']),
+        ]
         verbose_name_plural = "Flashcard progress records"
 
     def __str__(self):

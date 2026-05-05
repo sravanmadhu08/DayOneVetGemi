@@ -6,6 +6,7 @@ class Question(models.Model):
     options = models.JSONField(help_text="Array of strings")
     correct_answer_index = models.PositiveIntegerField()
     explanation = models.TextField()
+    exam_tip = models.TextField(blank=True, default="")
     species = models.JSONField(help_text="List of targeted species")
     system = models.CharField(max_length=100)
     image = models.ImageField(upload_to="question_images/", null=True, blank=True)

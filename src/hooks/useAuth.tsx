@@ -10,6 +10,7 @@ interface AuthContextType {
   subscriptionStatus: SubscriptionStatus | null;
   loading: boolean;
   signIn: () => Promise<void>;
+  signInWithGoogleCredential: (credential: string) => Promise<void>;
   signInWithEmail: (email: string, pass: string) => Promise<void>;
   signUpWithEmail: (email: string, pass: string, name: string) => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -83,7 +84,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [fetchProfile]);
 
   const signIn = async () => {
-    toast.error("Google Sign-In is temporarily unavailable. Please use email login.");
+    toast.error("Google Sign-In is not initialized yet.");
+  };
+
+  const signInWithGoogleCredential = async (credential: string) => {
+    try {
+      const data = await api.googleLogin({ credential });
+      localStorage.setItem('access_token', data.access);
+      localStorage.setItem('refresh_token', data.refresh);
+      await fetchProfile();
+      toast.success("Welcome back!");
+    } catch (error: any) {
+      toast.error(error.detail || "Google Sign-In failed");
+      throw error;
+    }
   };
 
   const signInWithEmail = async (email: string, pass: string) => {
@@ -210,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       subscriptionStatus,
       loading, 
       signIn, 
+      signInWithGoogleCredential,
       signInWithEmail, 
       signUpWithEmail, 
       resetPassword, 

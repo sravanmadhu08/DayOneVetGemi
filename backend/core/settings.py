@@ -43,6 +43,7 @@ SESSION_COOKIE_SAMESITE = os.getenv('SESSION_COOKIE_SAMESITE', 'Lax')
 X_FRAME_OPTIONS = os.getenv('X_FRAME_OPTIONS', 'DENY')
 
 CSRF_TRUSTED_ORIGINS = env_list('CSRF_TRUSTED_ORIGINS', 'http://localhost:3000,http://localhost:5173')
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID")
 
 INSTALLED_APPS = [
     'django.contrib.admin',

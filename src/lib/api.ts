@@ -68,6 +68,7 @@ const handleResponse = async <T>(promise: Promise<any>): Promise<T> => {
 export const api = {
   // Auth
   login: (data: any) => handleResponse<any>(apiClient.post('/auth/login/', data)),
+  googleLogin: (data: { credential: string }) => handleResponse<any>(apiClient.post('/auth/google/', data)),
   register: (data: any) => handleResponse<any>(apiClient.post('/auth/register/', data)),
 
   // Curriculum

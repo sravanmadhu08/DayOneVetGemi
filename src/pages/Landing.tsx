@@ -5,11 +5,37 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Stethoscope, Brain, GraduationCap, Search, Mail, Lock, User, ArrowRight, Loader2, BookOpen, Calculator, LayoutGrid, Zap, Activity } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential?: string }) => void;
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: {
+              theme?: string;
+              size?: string;
+              type?: string;
+              shape?: string;
+              width?: number;
+              text?: string;
+            },
+          ) => void;
+        };
+      };
+    };
+  }
+}
+
 export default function Landing() {
-  const { user, signIn, signInWithEmail, signUpWithEmail, resetPassword } = useAuth();
+  const { user, signIn, signInWithGoogleCredential, signInWithEmail, signUpWithEmail, resetPassword } = useAuth();
   const navigate = useNavigate();
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authMode, setAuthMode] = useState<'login' | 'signup' | 'reset'>('login');
@@ -18,6 +44,8 @@ export default function Landing() {
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
   const [backendDown, setBackendDown] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
   useEffect(() => {
     const checkBackend = async () => {
@@ -36,6 +64,61 @@ export default function Landing() {
       navigate('/dashboard');
     }
   }, [user, navigate]);
+
+  useEffect(() => {
+    if (!showAuthModal || !googleButtonRef.current) return;
+    if (!googleClientId) return;
+
+    let cancelled = false;
+
+    const renderGoogleButton = () => {
+      if (cancelled || !window.google || !googleButtonRef.current) return;
+      googleButtonRef.current.innerHTML = '';
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: async (response) => {
+          if (!response.credential) {
+            toast.error("Google did not return a credential");
+            return;
+          }
+          try {
+            await signInWithGoogleCredential(response.credential);
+          } catch {
+            // The auth hook already shows the error.
+          }
+        },
+      });
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        type: "standard",
+        shape: "pill",
+        width: 320,
+        text: authMode === "signup" ? "signup_with" : "signin_with",
+      });
+    };
+
+    if (window.google) {
+      renderGoogleButton();
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>('script[src="https://accounts.google.com/gsi/client"]');
+    const script = existingScript || document.createElement('script');
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.onload = renderGoogleButton;
+    if (!existingScript) {
+      document.head.appendChild(script);
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [authMode, googleClientId, showAuthModal, signInWithGoogleCredential]);
 
   const handleEmailAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,14 +399,18 @@ export default function Landing() {
                 </div>
 
                 <div className="space-y-5">
-                  <Button 
-                    variant="outline" 
-                    className="w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] border-2 hover:bg-muted/50 transition-all"
-                    onClick={() => signIn()}
-                  >
-                    <img src="https://www.google.com/favicon.ico" className="h-4 w-4" alt="Google" referrerPolicy="no-referrer" />
-                    Google Identity
-                  </Button>
+                  {googleClientId ? (
+                    <div className="flex min-h-14 items-center justify-center" ref={googleButtonRef} />
+                  ) : (
+                    <Button
+                      variant="outline"
+                      className="w-full h-14 rounded-2xl flex items-center justify-center gap-3 font-black uppercase tracking-widest text-[10px] border-2 hover:bg-muted/50 transition-all"
+                      onClick={() => signIn()}
+                    >
+                      <img src="https://www.google.com/favicon.ico" className="h-4 w-4" alt="Google" referrerPolicy="no-referrer" />
+                      Google Identity
+                    </Button>
+                  )}
 
                   <div className="relative">
                     <div className="absolute inset-0 flex items-center">

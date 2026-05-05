@@ -4,7 +4,7 @@ from django.http import JsonResponse
 from django.conf import settings
 from django.conf.urls.static import static
 from rest_framework.routers import DefaultRouter
-from accounts.views import UserProfileViewSet, GlobalSettingViewSet, RegisterView
+from accounts.views import UserProfileViewSet, GlobalSettingViewSet, RegisterView, GoogleLoginView
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
     TokenRefreshView,
@@ -43,6 +43,7 @@ urlpatterns = [
     path('api/health/', health_check, name='health_check'),
     path('api/auth/register/', RegisterView.as_view(), name='register'),
     path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/auth/google/', GoogleLoginView.as_view(), name='google_login'),
     path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
     path('api/', include(router.urls)),
 ]

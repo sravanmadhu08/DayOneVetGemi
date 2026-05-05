@@ -7,6 +7,7 @@ class UserProfile(models.Model):
     specialty = models.CharField(max_length=100, blank=True, null=True)
     institution = models.CharField(max_length=200, blank=True, null=True)
     photo_url = models.URLField(blank=True, null=True)
+    google_sub = models.CharField(max_length=255, unique=True, blank=True, null=True)
     
     # Progress and stats can be stored as JSON for flexibility, 
     # or broken down into other models if needed.

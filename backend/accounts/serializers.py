@@ -48,3 +48,6 @@ class GlobalSettingSerializer(serializers.ModelSerializer):
     class Meta:
         model = GlobalSetting
         fields = '__all__'
+
+class GoogleLoginSerializer(serializers.Serializer):
+    credential = serializers.CharField()

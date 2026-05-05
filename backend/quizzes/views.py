@@ -2,18 +2,91 @@ from rest_framework import status, viewsets, permissions
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
+from django.db.models import Exists, OuterRef
 from .models import Question, QuizAttempt, CompletedPracticeQuestion, BookmarkedQuestion
 from .serializers import QuestionSerializer, QuizAttemptSerializer, CompletedPracticeQuestionSerializer, BookmarkedQuestionSerializer
 from core.permissions import IsAdminOrReadOnly, IsOwner
 
 class QuestionViewSet(viewsets.ModelViewSet):
-    queryset = Question.objects.select_related('creator', 'source_document')
+    queryset = Question.objects.all()
     serializer_class = QuestionSerializer
     permission_classes = [IsAdminOrReadOnly]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def get_queryset(self):
+        queryset = Question.objects.select_related('creator', 'source_document')
+        user = self.request.user
+
+        if user.is_authenticated:
+            bookmarks = BookmarkedQuestion.objects.filter(
+                user=user,
+                question=OuterRef('pk'),
+            )
+            queryset = queryset.annotate(is_bookmarked=Exists(bookmarks))
+
+        system = self.request.query_params.get('system')
+        species = self.request.query_params.get('species')
+
+        if system and system != 'All':
+            queryset = queryset.filter(system=system)
+        if species and species != 'All':
+            queryset = queryset.filter(species__icontains=species)
+
+        return queryset
+
     def perform_create(self, serializer):
         serializer.save(creator=self.request.user)
+
+    @action(detail=False, methods=['get'], permission_classes=[permissions.IsAuthenticated])
+    def session(self, request):
+        queryset = self.get_queryset()
+        count_param = request.query_params.get('count', '10')
+        mode = request.query_params.get('mode', 'practice')
+
+        if mode == 'practice':
+            completed = CompletedPracticeQuestion.objects.filter(
+                user=request.user,
+                question=OuterRef('pk'),
+                was_correct=True,
+            )
+            queryset = queryset.annotate(is_completed=Exists(completed)).filter(is_completed=False)
+        elif mode == 'review':
+            completed = CompletedPracticeQuestion.objects.filter(
+                user=request.user,
+                question=OuterRef('pk'),
+                was_correct=True,
+            )
+            queryset = queryset.annotate(is_completed=Exists(completed)).filter(is_completed=True)
+        elif mode != 'exam':
+            return Response(
+                {"detail": "mode must be practice, review, or exam."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        if count_param == 'All':
+            count = None
+        elif count_param.isdigit():
+            count = min(int(count_param), 100)
+        else:
+            return Response(
+                {"detail": "count must be a positive integer or All."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        queryset = queryset.order_by('?')
+        if count is not None:
+            queryset = queryset[:count]
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response({
+            "questions": serializer.data,
+            "config": {
+                "species": request.query_params.get('species', 'All'),
+                "system": request.query_params.get('system', 'All'),
+                "count": len(serializer.data),
+                "mode": mode,
+            },
+        })
 
     @action(detail=True, methods=['post', 'delete'], permission_classes=[permissions.IsAuthenticated])
     def bookmark(self, request, pk=None):

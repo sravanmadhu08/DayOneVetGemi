@@ -65,28 +65,36 @@ const handleResponse = async <T>(promise: Promise<any>): Promise<T> => {
   }
 };
 
+const handleListResponse = async <T>(promise: Promise<any>): Promise<T[]> => {
+  const data = await handleResponse<T[] | { results: T[] }>(promise);
+  return Array.isArray(data) ? data : data.results;
+};
+
 export const api = {
   // Auth
   login: (data: any) => handleResponse<any>(apiClient.post('/auth/login/', data)),
   register: (data: any) => handleResponse<any>(apiClient.post('/auth/register/', data)),
 
   // Curriculum
-  getModules: () => handleResponse<StudyModule[]>(apiClient.get('/modules/')),
+  getModules: () => handleListResponse<StudyModule>(apiClient.get('/modules/')),
   getModule: (id: string | number) => handleResponse<StudyModule>(apiClient.get(`/modules/${id}/`)),
   createModule: (data: any) => handleResponse<any>(apiClient.post('/modules/', data)),
   updateModule: (id: string | number, data: any) => handleResponse<any>(apiClient.patch(`/modules/${id}/`, data)),
   deleteModule: (id: string | number) => handleResponse<any>(apiClient.delete(`/modules/${id}/`)),
   
   getModuleProgress: (moduleId?: string | number) => 
-    handleResponse<any[]>(apiClient.get('/module-progress/', { params: moduleId ? { module: moduleId } : {} })),
+    handleListResponse<any>(apiClient.get('/module-progress/', { params: moduleId ? { module: moduleId } : {} })),
   saveModuleProgress: (data: { module: string | number; current_section_index: number; completed: boolean }) => 
     handleResponse<any>(apiClient.post('/module-progress/', data)),
   updateModuleProgress: (id: number, data: { current_section_index: number; completed: boolean }) =>
     handleResponse<any>(apiClient.patch(`/module-progress/${id}/`, data)),
   
   // Quizzes
-  getQuestions: (params?: { system?: string; species?: string }) => 
-    handleResponse<Question[]>(apiClient.get('/questions/', { params })),
+  getQuestions: (params?: { system?: string; species?: string; limit?: number; offset?: number }) => 
+    handleListResponse<Question>(apiClient.get('/questions/', { params })),
+
+  getQuestionSession: (params: { system?: string; species?: string; count?: string | number; mode?: string }) =>
+    handleResponse<{ questions: Question[]; config: any }>(apiClient.get('/questions/session/', { params })),
   
   createQuestion: (data: any) => handleResponse<Question>(apiClient.post('/questions/', data)),
   updateQuestion: (id: string | number, data: any) => handleResponse<Question>(apiClient.patch(`/questions/${id}/`, data)),
@@ -99,16 +107,16 @@ export const api = {
     handleResponse<any>(apiClient.post('/quiz-attempts/', data)),
 
   getQuizHistory: (limit?: number) =>
-    handleResponse<any[]>(apiClient.get('/quiz-attempts/', { params: limit ? { limit } : {} })),
+    handleListResponse<any>(apiClient.get('/quiz-attempts/', { params: limit ? { limit } : {} })),
 
   getCompletedPracticeQuestions: () =>
-    handleResponse<any[]>(apiClient.get('/completed-questions/')),
+    handleListResponse<any>(apiClient.get('/completed-questions/')),
 
   saveCompletedPracticeQuestion: (data: { question: number | string; was_correct: boolean }) =>
     handleResponse<any>(apiClient.post('/completed-questions/', data)),
 
   getBookmarkedQuestions: () =>
-    handleResponse<any[]>(apiClient.get('/bookmarked-questions/')),
+    handleListResponse<any>(apiClient.get('/bookmarked-questions/')),
 
   bookmarkQuestion: (id: string | number) =>
     handleResponse<any>(apiClient.post(`/questions/${id}/bookmark/`)),
@@ -117,13 +125,17 @@ export const api = {
     handleResponse<void>(apiClient.delete(`/questions/${id}/bookmark/`)),
 
   // Flashcards
-  getFlashcards: () => handleResponse<Flashcard[]>(apiClient.get('/flashcards/')),
+  getFlashcards: (params?: { limit?: number; offset?: number }) =>
+    handleListResponse<Flashcard>(apiClient.get('/flashcards/', { params })),
+
+  getDueFlashcards: (limit?: number) =>
+    handleListResponse<Flashcard>(apiClient.get('/flashcards/due/', { params: limit ? { limit } : {} })),
   
   createFlashcard: (data: Partial<Flashcard>) => 
     handleResponse<Flashcard>(apiClient.post('/flashcards/', data)),
   
   getFlashcardProgress: () => 
-    handleResponse<any[]>(apiClient.get('/flashcard-progress/')),
+    handleListResponse<any>(apiClient.get('/flashcard-progress/')),
   
   saveFlashcardProgress: (data: { flashcard: string | number; interval: number; ease: number; next_review: string; consecutive_correct: number }) =>
     handleResponse<any>(apiClient.post('/flashcard-progress/', data)),
@@ -132,17 +144,17 @@ export const api = {
     handleResponse<any>(apiClient.patch(`/flashcard-progress/${progressId}/`, data)),
 
   // Library
-  getDocuments: () => handleResponse<any[]>(apiClient.get('/documents/')),
+  getDocuments: () => handleListResponse<any>(apiClient.get('/documents/')),
   getDocument: (id: string | number) => handleResponse<any>(apiClient.get(`/documents/${id}/`)),
   createDocument: (data: any) => handleResponse<any>(apiClient.post('/documents/', data)),
   deleteDocument: (id: string | number) => handleResponse<any>(apiClient.delete(`/documents/${id}/`)),
   
-  getGuidelines: () => handleResponse<any[]>(apiClient.get('/guidelines/')),
+  getGuidelines: () => handleListResponse<any>(apiClient.get('/guidelines/')),
   createGuideline: (data: any) => handleResponse<any>(apiClient.post('/guidelines/', data)),
   updateGuideline: (id: string | number, data: any) => handleResponse<any>(apiClient.patch(`/guidelines/${id}/`, data)),
   deleteGuideline: (id: string | number) => handleResponse<any>(apiClient.delete(`/guidelines/${id}/`)),
   
-  getResources: () => handleResponse<any[]>(apiClient.get('/resources/')),
+  getResources: () => handleListResponse<any>(apiClient.get('/resources/')),
   createResource: (data: any) => handleResponse<any>(apiClient.post('/resources/', data)),
   updateResource: (id: string | number, data: any) => handleResponse<any>(apiClient.patch(`/resources/${id}/`, data)),
   deleteResource: (id: string | number) => handleResponse<any>(apiClient.delete(`/resources/${id}/`)),

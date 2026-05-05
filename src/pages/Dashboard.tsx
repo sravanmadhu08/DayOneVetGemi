@@ -25,13 +25,12 @@ export default function Dashboard() {
     if (!user) return;
     setLoadingCards(true);
     try {
-      const [userCards, progressDataArr] = await Promise.all([
-        api.getFlashcards(),
-        api.getFlashcardProgress()
-      ]);
+      const userCards = await api.getDueFlashcards();
       
       const progMap: Record<string, any> = {};
-      progressDataArr.forEach((p: any) => {
+      userCards.forEach((card: any) => {
+        const p = card.progress;
+        if (!p) return;
         progMap[String(p.flashcard)] = {
           id: p.id,
           cardId: String(p.flashcard),
@@ -43,13 +42,7 @@ export default function Dashboard() {
       });
       setProgressData(progMap);
 
-      const now = Date.now();
-      const due = userCards.filter(card => {
-        const cardProgress = progMap[card.id];
-        return !cardProgress || cardProgress.nextReview <= now;
-      });
-
-      setDueCards(due);
+      setDueCards(userCards);
     } catch (err) {
       console.error('Error fetching due cards:', err);
     } finally {

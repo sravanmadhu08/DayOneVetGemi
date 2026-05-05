@@ -1,6 +1,9 @@
 from rest_framework import viewsets, permissions
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.exceptions import ValidationError
 from django.db.models import Q
+from django.utils import timezone
 from .models import Flashcard, FlashcardProgress, MAX_CUSTOM_FLASHCARDS_PER_USER
 from .serializers import FlashcardSerializer, FlashcardProgressSerializer
 from core.permissions import IsAdminOrReadOnly, IsOwner
@@ -12,16 +15,11 @@ class FlashcardViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Normal users can see all global flashcards + their own
-        limit = self.request.query_params.get('limit')
         if self.request.user.is_staff:
-            queryset = Flashcard.objects.select_related('creator')
-        else:
-            queryset = Flashcard.objects.select_related('creator').filter(
-                Q(creator__isnull=True) | Q(creator=self.request.user)
-            )
-        if limit and limit.isdigit():
-            return queryset[:int(limit)]
-        return queryset
+            return Flashcard.objects.select_related('creator')
+        return Flashcard.objects.select_related('creator').filter(
+            Q(creator__isnull=True) | Q(creator=self.request.user)
+        )
 
     def perform_create(self, serializer):
         if not self.request.user.is_staff:
@@ -34,6 +32,55 @@ class FlashcardViewSet(viewsets.ModelViewSet):
                     )
                 })
         serializer.save(creator=self.request.user)
+
+    @action(detail=False, methods=['get'])
+    def due(self, request):
+        if request.user.is_staff:
+            visible_cards = Flashcard.objects.select_related('creator')
+        else:
+            visible_cards = Flashcard.objects.select_related('creator').filter(
+                Q(creator__isnull=True) | Q(creator=request.user)
+            )
+
+        reviewed = FlashcardProgress.objects.filter(user=request.user).values('flashcard_id')
+        due_progress = FlashcardProgress.objects.filter(
+            user=request.user,
+            flashcard_id__in=visible_cards.values('id'),
+            next_review__lte=timezone.now(),
+        ).values('flashcard_id')
+
+        queryset = visible_cards.filter(Q(id__in=due_progress) | ~Q(id__in=reviewed))
+
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(self.add_progress_data(serializer.data))
+
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(self.add_progress_data(serializer.data))
+
+    def add_progress_data(self, cards):
+        card_ids = [card['id'] for card in cards]
+        progress_by_card = {
+            progress.flashcard_id: progress
+            for progress in FlashcardProgress.objects.filter(
+                user=self.request.user,
+                flashcard_id__in=card_ids,
+            )
+        }
+
+        for card in cards:
+            progress = progress_by_card.get(card['id'])
+            card['progress'] = {
+                'id': progress.id,
+                'flashcard': progress.flashcard_id,
+                'interval': progress.interval,
+                'ease': progress.ease,
+                'next_review': progress.next_review,
+                'last_reviewed': progress.last_reviewed,
+                'consecutive_correct': progress.consecutive_correct,
+            } if progress else None
+        return cards
 
 class FlashcardProgressViewSet(viewsets.ModelViewSet):
     queryset = FlashcardProgress.objects.all()

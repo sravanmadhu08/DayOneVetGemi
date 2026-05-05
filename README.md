@@ -28,27 +28,21 @@ A high-performance medical preparation platform built with React, Vite, and Djan
    ```
 4. Run migrations:
    ```bash
-   python manage.py migrate
-   ```
-5. Start development server:
-   ```bash
-   python manage.py runserver
+   # The server.ts will attempt to run this automatically on startup
+   python backend/manage.py migrate
    ```
 
-### Frontend Setup
+### Application Setup
 
 1. Install dependencies from the root directory:
    ```bash
    npm install
    ```
-2. Set up environment variables in `.env`:
-   ```bash
-   VITE_API_BASE_URL=http://localhost:8000/api
-   ```
-3. Start Vite dev server:
+2. Start the integrated dev server:
    ```bash
    npm run dev
    ```
+   *This starts both the Django backend (port 8000) and the Vite frontend (port 3000) with an automated proxy.*
 
 ## Key Features
 

@@ -14,41 +14,67 @@ async function startServer() {
 
   console.log('Starting backend services...');
   
-  // Run migrations
-  try {
-    console.log('Running Django migrations...');
-    const migration = spawn('python3', ['backend/manage.py', 'migrate'], {
-      stdio: 'inherit'
-    });
-    migration.on('close', (code) => {
-      console.log(`Migration completed with code ${code}`);
-    });
-  } catch (err) {
-    console.error('Migration failed:', err);
-  }
-  
-  // Try starting Django with python3 or python
-  const startDjango = () => {
-    const pythonCmd = 'python3';
-    console.log(`Executing ${pythonCmd} backend/manage.py runserver 8000`);
-    const django = spawn(pythonCmd, ['backend/manage.py', 'runserver', '8000'], {
-      stdio: 'inherit',
-      env: { ...process.env, PYTHONUNBUFFERED: '1' }
-    });
+  const isWindows = process.platform === 'win32';
+  const venvPython = isWindows 
+    ? path.join(__dirname, 'backend', 'venv', 'Scripts', 'python.exe')
+    : path.join(__dirname, 'backend', 'venv', 'bin', 'python');
 
-    django.on('error', (err) => {
-      console.error('Failed to start Django with python3:', err);
-      console.log('Retrying with python...');
-      spawn('python', ['backend/manage.py', 'runserver', '8000'], {
+  // Order of preference: Virtual Env -> python3 -> python
+  const pythonCmds = [venvPython, 'python3', 'python'];
+
+  const runDjangoCommand = (args: string[], onExit?: (code: number | null) => void) => {
+    let currentCmdIndex = 0;
+
+    const attempt = () => {
+      const cmd = pythonCmds[currentCmdIndex];
+      
+      console.log(`[Backend] Attempting command with: ${cmd}`);
+      const proc = spawn(cmd, args, {
         stdio: 'inherit',
         env: { ...process.env, PYTHONUNBUFFERED: '1' }
       });
-    });
-    
-    return django;
+
+      proc.on('error', (err: any) => {
+        if (err.code === 'ENOENT') {
+          if (currentCmdIndex < pythonCmds.length - 1) {
+            console.log(`[Backend] ${cmd} not found, trying next option...`);
+            currentCmdIndex++;
+            attempt();
+          } else {
+            console.error(`[Backend] Fatal: No Python executable found in path. tried: ${pythonCmds.join(', ')}`);
+          }
+        } else {
+          console.error(`[Backend] Failed to execute ${cmd}:`, err);
+        }
+      });
+
+      if (onExit) {
+        proc.on('close', (code) => {
+          if (code !== 0 && code !== null) {
+            console.warn(`[Backend] Command "${cmd} ${args[0]}" exited with code ${code}.`);
+          }
+          onExit(code);
+        });
+      }
+
+      return proc;
+    };
+
+    return attempt();
   };
 
-  const djangoProcess = startDjango();
+  // Run migrations
+  console.log('Running Django migrations...');
+  runDjangoCommand(['backend/manage.py', 'migrate'], (code) => {
+    if (code === 0) {
+      console.log('Migrations completed successfully.');
+    } else {
+      console.warn('Migration step finished with non-zero exit code. Attempting to start server anyway...');
+    }
+    
+    console.log('Starting Django development server...');
+    runDjangoCommand(['backend/manage.py', 'runserver', '8000']);
+  });
 
   // Proxy API requests to Django
   app.use('/api', createProxyMiddleware({

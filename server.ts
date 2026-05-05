@@ -54,12 +54,14 @@ async function startServer() {
   app.use('/api', createProxyMiddleware({
     target: 'http://127.0.0.1:8000',
     changeOrigin: true,
-    onError: (err, req, res) => {
-      console.error('Proxy Error for /api:', err);
-      res.status(502).json({ error: 'Backend unreachable', details: err.message });
-    },
-    onProxyReq: (proxyReq, req, res) => {
-      console.log(`Proxying ${req.method} ${req.url} to Django...`);
+    on: {
+      error: (err, req, res) => {
+        console.error('Proxy Error for /api:', err);
+        (res as any).status(502).json({ error: 'Backend unreachable', details: (err as any).message });
+      },
+      proxyReq: (proxyReq, req, res) => {
+        console.log(`Proxying ${req.method} ${req.url} to Django...`);
+      }
     }
   }));
 

@@ -146,19 +146,4 @@ export const api = {
   updateGlobalSettings: (settings: any) => handleResponse<any>(apiClient.patch('/settings/global/', { value: settings })),
   getSubscriptionStatus: () => handleResponse<any>(apiClient.get('/subscription/status/')),
   createCheckoutSession: () => handleResponse<any>(apiClient.post('/subscription/create-checkout/')),
-
-  // AI Import
-  parseQuestionsFromDocx: (file: File, sourceId?: string) => {
-    const formData = new FormData();
-    formData.append('file', file);
-    if (sourceId && sourceId !== 'none') formData.append('source_id', sourceId);
-    return handleResponse<Question[]>(apiClient.post('/ai/parse-questions/', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      },
-    }));
-  },
-  
-  parseQuestionsFromText: (text: string, sourceId?: string) => 
-    handleResponse<Question[]>(apiClient.post('/ai/parse-questions/', { text, source_id: sourceId !== 'none' ? sourceId : undefined })),
 };

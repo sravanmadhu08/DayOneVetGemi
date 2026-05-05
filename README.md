@@ -6,7 +6,6 @@ A high-performance medical preparation platform built with React, Vite, and Djan
 
 - **Frontend**: React 19 + TypeScript + Vite + Tailwind CSS + Framer Motion
 - **Backend**: Django + Django REST Framework (DRF)
-- **Intelligence Layer**: Google Gemini API (Long-context medical document parsing)
 - **Database**: PostgreSQL (Production) / SQLite (Development)
 
 ## Getting Started
@@ -17,13 +16,18 @@ A high-performance medical preparation platform built with React, Vite, and Djan
    ```bash
    cd backend
    ```
-2. Install dependencies:
+2. Install dependencies (Virtual Env recommended):
    ```bash
+   python -m venv venv
+   # Windows:
+   venv\Scripts\activate
+   # Linux/Mac:
+   source venv/bin/activate
+   
    pip install -r requirements.txt
    ```
 3. Set up environment variables in `backend/.env`:
    ```bash
-   GEMINI_API_KEY=your_gemini_api_key
    SECRET_KEY=your_django_secret_key
    ```
 4. Run migrations:
@@ -46,7 +50,6 @@ A high-performance medical preparation platform built with React, Vite, and Djan
 
 ## Key Features
 
-- **Clinical Dataset Ingestion**: Bulk import medical documents (.docx) via Gemini AI.
 - **Adaptive Quiz Engine**: Personalized clinical scenario testing.
 - **Neural Flashcards**: Spaced-repetition learning for medical facts.
 - **Global Strategy Hub**: Centralized clinical guidelines and resources.

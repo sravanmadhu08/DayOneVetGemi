@@ -4,7 +4,7 @@ import { useAuth } from '@/src/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Stethoscope, Brain, GraduationCap, Search, Mail, Lock, User, ArrowRight, Loader2, Sparkles, BookOpen, Calculator, LayoutGrid, Zap } from 'lucide-react';
+import { Stethoscope, Brain, GraduationCap, Search, Mail, Lock, User, ArrowRight, Loader2, BookOpen, Calculator, LayoutGrid, Zap, Activity } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -17,6 +17,19 @@ export default function Landing() {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [loading, setLoading] = useState(false);
+  const [backendDown, setBackendDown] = useState(false);
+
+  useEffect(() => {
+    const checkBackend = async () => {
+      try {
+        const response = await fetch('/api/health/');
+        if (!response.ok) setBackendDown(true);
+      } catch (e) {
+        setBackendDown(true);
+      }
+    };
+    checkBackend();
+  }, []);
 
   useEffect(() => {
     if (user) {
@@ -75,6 +88,15 @@ export default function Landing() {
           <span className="text-xl font-black tracking-tighter text-foreground">
             DayOne<span className="text-primary italic">Vet</span>
           </span>
+          {backendDown && (
+            <div className="ml-4 flex flex-col">
+              <div className="px-3 py-1 bg-destructive/10 border border-destructive/20 rounded-full flex items-center gap-2">
+                <div className="h-2 w-2 rounded-full bg-destructive animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-destructive">Backend Offline</span>
+              </div>
+              <span className="text-[8px] text-muted-foreground mt-1 ml-1 font-mono">Check server logs or CORS settings</span>
+            </div>
+          )}
         </div>
         <nav className="flex items-center gap-3">
           <Button variant="ghost" className="rounded-xl font-bold hidden sm:flex" onClick={() => { setAuthMode('login'); setShowAuthModal(true); }}>Sign In</Button>
@@ -93,7 +115,7 @@ export default function Landing() {
                 className="space-y-6 max-w-4xl"
               >
                 <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.2em] text-primary mb-4 backdrop-blur-md">
-                  <Sparkles className="h-3 w-3" />
+                  <Activity className="h-3 w-3" />
                   Clinical Protocol Engine v2.0
                 </div>
                 <h1 className="text-5xl md:text-7xl lg:text-8xl font-black tracking-tighter leading-[0.95] text-foreground">
@@ -158,7 +180,7 @@ export default function Landing() {
                 </div>
                 <div className="w-full md:w-64 h-48 bg-muted/40 rounded-3xl border border-border/30 rotate-12 group-hover:rotate-6 transition-transform flex items-center justify-center p-6 relative overflow-hidden">
                    <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/10 to-transparent" />
-                   <Sparkles className="h-10 w-10 text-indigo-500/20" />
+                   <Activity className="h-10 w-10 text-indigo-500/20" />
                    <div className="absolute inset-x-4 bottom-4 h-2 rounded-full bg-indigo-500/20" />
                 </div>
               </motion.div>
@@ -195,8 +217,8 @@ export default function Landing() {
                     <div className="h-12 w-12 rounded-2xl bg-amber-500/10 flex items-center justify-center">
                        <LayoutGrid className="h-6 w-6 text-amber-500" />
                     </div>
-                    <h3 className="text-2xl font-black tracking-tight">Predictive Analytics</h3>
-                    <p className="text-muted-foreground font-medium leading-relaxed">Visual intelligence that precisely identifies clinical knowledge gaps before they impact performance.</p>
+                    <h3 className="text-2xl font-black tracking-tight">Performance Analytics</h3>
+                    <p className="text-muted-foreground font-medium leading-relaxed">Visual insights that precisely identify clinical knowledge gaps before they impact performance.</p>
                  </div>
               </motion.div>
             </motion.div>
@@ -219,7 +241,7 @@ export default function Landing() {
                 Join DayOneVet Now
               </Button>
               <div className="flex items-center justify-center gap-8 opacity-40 grayscale group hover:grayscale-0 hover:opacity-100 transition-all">
-                 <span className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><Sparkles className="h-3 w-3" /> Professional Access</span>
+                 <span className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><ArrowRight className="h-3 w-3" /> Professional Access</span>
                  <span className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><Calculator className="h-3 w-3" /> Evidence Based</span>
                  <span className="text-[10px] font-black uppercase tracking-[0.2em] flex items-center gap-2"><GraduationCap className="h-3 w-3" /> Accredited Standards</span>
               </div>

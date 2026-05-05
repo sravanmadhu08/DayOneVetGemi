@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from django.http import JsonResponse
+from django.conf import settings
 from rest_framework.routers import DefaultRouter
 from accounts.views import UserProfileViewSet, GlobalSettingViewSet, RegisterView
 from rest_framework_simplejwt.views import (
@@ -30,7 +31,24 @@ router.register(r'resources', ResourceViewSet)
 router.register(r'subscription', SubscriptionViewSet, basename='subscription')
 
 def health_check(request):
-    return JsonResponse({"status": "ok", "message": "Backend is running"})
+    db_path = settings.BASE_DIR / 'db.sqlite3'
+    db_exists = db_path.exists()
+    user_count = 0
+    if db_exists:
+        try:
+            from django.contrib.auth.models import User
+            user_count = User.objects.count()
+        except:
+            pass
+            
+    return JsonResponse({
+        "status": "ok", 
+        "message": "Backend is running",
+        "db_exists": db_exists,
+        "user_count": user_count,
+        "debug": settings.DEBUG,
+        "allowed_hosts": settings.ALLOWED_HOSTS
+    })
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -38,6 +56,5 @@ urlpatterns = [
     path('api/auth/register/', RegisterView.as_view(), name='register'),
     path('api/auth/login/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
     path('api/auth/refresh/', TokenRefreshView.as_view(), name='token_refresh'),
-    path('api/ai/', include('ai_import.urls')),
     path('api/', include(router.urls)),
 ]

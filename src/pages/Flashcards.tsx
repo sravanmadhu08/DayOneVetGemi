@@ -23,7 +23,6 @@ import {
   Zap,
   Command,
   Search,
-  Sparkles,
   ThumbsUp,
   ThumbsDown,
   Clock,
@@ -523,7 +522,7 @@ export default function Flashcards() {
             <div className="max-w-3xl mx-auto space-y-12">
               <div className="space-y-4 text-center">
                  <div className="h-20 w-20 rounded-[2.5rem] bg-primary/10 flex items-center justify-center mx-auto mb-6 rotate-12 transition-transform hover:rotate-0">
-                    <Sparkles className="h-10 w-10 text-primary" strokeWidth={3} />
+                    <Brain className="h-10 w-10 text-primary" strokeWidth={3} />
                  </div>
                  <h2 className="text-3xl font-black tracking-tighter uppercase">Intelligence Capture</h2>
                  <p className="text-muted-foreground font-medium text-lg">Define new cognitive protocols for personal clinical advancement.</p>

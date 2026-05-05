@@ -22,7 +22,6 @@ import {
   Download,
   Info,
   ArrowRight,
-  Sparkles,
   CheckCircle2,
 } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -184,7 +183,7 @@ export default function StudyModules() {
 
       if (selectedFile) {
         toast.error(
-          "Direct file uploads are handled via the AI Import feature for now. Please provide a URL for static documents."
+          "Direct file uploads are currently disabled. Please provide a URL for static documents."
         );
         setIsUploading(false);
         return;

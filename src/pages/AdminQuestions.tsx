@@ -14,7 +14,7 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit2, ChevronLeft, Upload, Sparkles, Loader2, Database, Search, LayoutList, Filter } from "lucide-react";
+import { Plus, Trash2, Edit2, ChevronLeft, Database, Search, LayoutList, Filter, Loader2 } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   AlertDialog,
@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { BulkImport } from "@/src/components/BulkImport";
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -37,7 +37,6 @@ export default function AdminQuestions() {
   const { profile, globalSettings } = useAuth();
   const [questions, setQuestions] = useState<any[]>([]);
   const [isOpen, setIsOpen] = useState(false);
-  const [isBulkOpen, setIsBulkOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<any | null>(null);
   const [isSeeding, setIsSeeding] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -174,10 +173,6 @@ export default function AdminQuestions() {
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
-           <Button variant="outline" onClick={() => setIsBulkOpen(true)} className="rounded-xl font-bold gap-2 border-primary/20">
-              <Upload className="h-4 w-4 text-primary" /> Bulk AI Import
-           </Button>
-
            <Button 
              variant="outline" 
              onClick={handleSeedQuestions} 
@@ -301,11 +296,7 @@ export default function AdminQuestions() {
         </div>
       </div>
 
-      <Dialog open={isBulkOpen} onOpenChange={setIsBulkOpen}>
-        <DialogContent className="max-w-4xl rounded-[2.5rem] p-0 overflow-hidden border-none shadow-2xl">
-           <BulkImport />
-        </DialogContent>
-      </Dialog>
+
 
       <div className="space-y-6">
         <div className="relative h-14 group">

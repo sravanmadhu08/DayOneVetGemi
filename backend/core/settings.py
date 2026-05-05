@@ -12,7 +12,14 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fallback-key')
 
 DEBUG = os.getenv('DEBUG', 'True') == 'True'
 
-ALLOWED_HOSTS = os.getenv('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',')
+ALLOWED_HOSTS = ['*']
+
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.run.app',
+    'https://*.google.com',
+    'http://localhost:3000',
+    'http://localhost:5173',
+]
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -32,7 +39,6 @@ INSTALLED_APPS = [
     'quizzes',
     'flashcards',
     'library',
-    'ai_import',
     'subscriptions',
 ]
 
@@ -104,6 +110,8 @@ STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 CORS_ALLOWED_ORIGINS = os.getenv('CORS_ALLOWED_ORIGINS', 'http://localhost:3000').split(',')
+if DEBUG:
+    CORS_ALLOW_ALL_ORIGINS = True
 
 from datetime import timedelta
 

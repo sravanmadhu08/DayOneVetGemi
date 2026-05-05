@@ -14,7 +14,7 @@ import {
   DialogTrigger,
   DialogDescription,
 } from "@/components/ui/dialog";
-import { Plus, Trash2, Edit2, ChevronLeft, Sparkles, Loader2, Database, LayoutGrid } from "lucide-react";
+import { Plus, Trash2, Edit2, ChevronLeft, Loader2, Database, LayoutGrid } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   AlertDialog,
@@ -200,7 +200,7 @@ export default function AdminModules() {
              disabled={isSeeding}
              className="rounded-xl font-bold gap-2 border-primary/20"
            >
-              {isSeeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4 text-primary" />}
+              {isSeeding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Database className="h-4 w-4 text-primary" />}
               Set Defaults
            </Button>
 

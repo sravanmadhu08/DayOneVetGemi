@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Brain, Eye, ThumbsUp, ThumbsDown, RotateCcw, Sparkles, Command } from 'lucide-react';
+import { Brain, Eye, ThumbsUp, ThumbsDown, RotateCcw, Command } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 
 interface Flashcard {
@@ -156,7 +156,7 @@ export function DashboardFlashcards({ dueCards, loading, onReview, onRefresh }: 
               className="flex-1 flex flex-col items-center justify-center py-20 text-center"
             >
               <div className="h-24 w-24 rounded-[2.5rem] bg-emerald-500/10 flex items-center justify-center mb-10 rotate-6 border border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
-                <Sparkles className="h-10 w-10 text-emerald-500" strokeWidth={3} />
+                <Brain className="h-10 w-10 text-emerald-500" strokeWidth={3} />
               </div>
               <h3 className="text-xl font-black tracking-tighter mb-2">Cycle Cleared</h3>
               <p className="text-xs text-muted-foreground font-medium mb-8 max-w-[200px] mx-auto leading-relaxed">Your professional memory pool is fully optimized for current protocols.</p>

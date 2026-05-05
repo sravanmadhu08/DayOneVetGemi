@@ -7,7 +7,7 @@ import { StudyModule, Flashcard } from '@/src/types';
 import { DashboardStats } from '@/src/components/dashboard/DashboardStats';
 import { DashboardFlashcards } from '@/src/components/dashboard/DashboardFlashcards';
 import { RecentModules } from '@/src/components/dashboard/RecentModules';
-import { Sparkles, Calendar } from 'lucide-react';
+import { Activity, Calendar } from 'lucide-react';
 
 export default function Dashboard() {
   const { profile, user } = useAuth();
@@ -113,8 +113,8 @@ export default function Dashboard() {
           className="space-y-2"
         >
           <div className="flex items-center gap-2 text-primary font-black uppercase tracking-[0.2em] text-[10px]">
-            <Sparkles className="h-3 w-3" />
-            Clinical Intelligence App
+            <Activity className="h-3 w-3" />
+            Clinical Learning Workspace
           </div>
           <h1 className="text-4xl md:text-5xl font-black tracking-tighter text-foreground">
             DayOne<span className="text-primary italic">Vet</span>

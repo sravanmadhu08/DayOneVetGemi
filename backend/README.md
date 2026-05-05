@@ -8,7 +8,6 @@ This is the Django migration of the Veterinary Learning App backend.
 - `quizzes/`: Question pool and progress tracking.
 - `flashcards/`: SRS based flashcard system.
 - `library/`: PDF resources and guidelines.
-- `ai_import/`: Gemini-powered automated content import.
 - `subscriptions/`: Billing and user tiers.
 
 ## Getting Started Locally

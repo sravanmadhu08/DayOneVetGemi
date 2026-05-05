@@ -168,8 +168,52 @@ export default function Navbar() {
                   </SheetDescription>
                 </SheetHeader>
                 <NavContent mobile />
-                <div className="mt-8 pt-8 border-t border-border/50 px-2 sm:hidden">
-                   <ThemeToggle />
+                <div className="mt-8 pt-8 border-t border-border/50 px-2 flex flex-col gap-4">
+                  <div className="space-y-1">
+                    <p className="px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50 mb-2">Account</p>
+                    <Link
+                      to="/profile"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center gap-4 px-4 py-3 text-xs font-black uppercase tracking-widest text-foreground hover:bg-muted rounded-xl transition-all"
+                    >
+                      <UserIcon className="h-4 w-4 text-primary" />
+                      <span>Profile</span>
+                    </Link>
+                    <Link
+                      to="/progress"
+                      onClick={() => setIsOpen(false)}
+                      className="flex items-center gap-4 px-4 py-3 text-xs font-black uppercase tracking-widest text-foreground hover:bg-muted rounded-xl transition-all"
+                    >
+                      <TrendingUp className="h-4 w-4 text-primary" />
+                      <span>Analytics</span>
+                    </Link>
+                    {profile?.isAdmin && (
+                      <Link
+                        to="/admin/settings"
+                        onClick={() => setIsOpen(false)}
+                        className="flex items-center gap-4 px-4 py-3 text-xs font-black uppercase tracking-widest text-foreground hover:bg-muted rounded-xl transition-all"
+                      >
+                        <Settings className="h-4 w-4 text-primary" />
+                        <span>Admin Control</span>
+                      </Link>
+                    )}
+                  </div>
+                  <div className="pt-4 border-t border-border/50">
+                    <Button
+                      variant="ghost"
+                      onClick={() => {
+                        setIsOpen(false);
+                        logout();
+                      }}
+                      className="w-full justify-start gap-4 px-4 py-6 text-xs font-black uppercase tracking-widest text-destructive hover:bg-destructive/10 hover:text-destructive rounded-xl transition-all"
+                    >
+                      <LogOut className="h-4 w-4" />
+                      <span>Terminate Session</span>
+                    </Button>
+                  </div>
+                   <div className="pt-4 flex justify-center">
+                      <ThemeToggle />
+                   </div>
                 </div>
               </SheetContent>
             </Sheet>

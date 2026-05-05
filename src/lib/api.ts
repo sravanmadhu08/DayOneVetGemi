@@ -45,7 +45,7 @@ apiClient.interceptors.response.use(
         } catch (refreshError) {
           localStorage.removeItem('access_token');
           localStorage.removeItem('refresh_token');
-          window.location.href = '/login';
+          window.location.href = '/welcome';
           return Promise.reject(refreshError);
         }
       }
@@ -102,10 +102,10 @@ export const api = {
     handleResponse<any[]>(apiClient.get('/quiz-attempts/', { params: limit ? { limit } : {} })),
 
   getCompletedPracticeQuestions: () =>
-    handleResponse<any[]>(apiClient.get('/completed-practice-questions/')),
+    handleResponse<any[]>(apiClient.get('/completed-questions/')),
 
   saveCompletedPracticeQuestion: (data: { question: number | string; was_correct: boolean }) =>
-    handleResponse<any>(apiClient.post('/completed-practice-questions/', data)),
+    handleResponse<any>(apiClient.post('/completed-questions/', data)),
 
   // Flashcards
   getFlashcards: () => handleResponse<Flashcard[]>(apiClient.get('/flashcards/')),

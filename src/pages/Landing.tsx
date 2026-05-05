@@ -353,12 +353,12 @@ export default function Landing() {
                       </div>
                     )}
                     <div className="space-y-2">
-                      <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1">Electronic Mail</Label>
+                      <Label className="text-[10px] font-black uppercase tracking-widest opacity-50 ml-1">Identifier (Email or Username)</Label>
                       <div className="relative group">
                         <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground group-focus-within:text-primary transition-colors" />
                         <Input
-                          type="email"
-                          placeholder="doc@vetica.pro"
+                          type="text"
+                          placeholder="doc@vetica.pro or admin"
                           className="h-12 pl-12 rounded-xl bg-muted/30 border-none font-bold placeholder:font-medium placeholder:opacity-50"
                           value={email}
                           onChange={(e) => setEmail(e.target.value)}

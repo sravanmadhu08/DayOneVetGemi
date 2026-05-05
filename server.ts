@@ -170,6 +170,13 @@ except Exception as e:
     const seedSettings = "from accounts.models import GlobalSetting; GlobalSetting.objects.get_or_create(key='global', defaults={'value': {'isFreeMode': True}, 'description': 'Main global settings'})";
     await execPromise(python, ['backend/manage.py', 'shell', '-c', seedSettings]);
 
+    // Create superuser if it doesn't exist, or reset password
+    writeLog('Ensuring superuser exists and password is set...\n');
+    const createSuperUser = "from django.contrib.auth import get_user_model; User = get_user_model(); admin = User.objects.filter(username='admin').first(); (admin and admin.set_password('admin123') or admin) or User.objects.create_superuser('admin', 'admin@example.com', 'admin123'); admin and admin.save()";
+    // Safer version:
+    const safeSuperUser = "from django.contrib.auth import get_user_model; User = get_user_model(); u, c = User.objects.get_or_create(username='admin', defaults={'email': 'admin@example.com', 'is_staff': True, 'is_superuser': True}); u.set_password('admin123'); u.save()";
+    await execPromise(python, ['backend/manage.py', 'shell', '-c', safeSuperUser]);
+
     // Start server
     console.log('Starting Django server on port 8001...');
     writeLog('--- Starting Django server on port 8001 ---\n');
@@ -197,6 +204,7 @@ except Exception as e:
   app.use(createProxyMiddleware({
     target: 'http://127.0.0.1:8001',
     changeOrigin: true,
+    xfwd: true,
     pathFilter: '/api',
     on: {
       error: (err, req, res) => {
@@ -215,6 +223,7 @@ except Exception as e:
   app.use(createProxyMiddleware({
     target: 'http://127.0.0.1:8001',
     changeOrigin: true,
+    xfwd: true,
     pathFilter: '/admin',
   }));
 
@@ -222,6 +231,7 @@ except Exception as e:
   app.use(createProxyMiddleware({
     target: 'http://127.0.0.1:8001',
     changeOrigin: true,
+    xfwd: true,
     pathFilter: '/static',
   }));
 

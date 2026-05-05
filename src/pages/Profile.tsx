@@ -32,6 +32,7 @@ import {
   Settings2,
   BookOpen,
   LayoutGrid,
+  ArrowRight,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { Link } from "react-router-dom";
@@ -318,7 +319,7 @@ export default function Profile() {
                    <div className="space-y-1">
                       <Label className="text-[8px] font-black uppercase opacity-40">Encryption Provider</Label>
                       <p className="text-xs font-black uppercase tracking-widest text-foreground/70">
-                         {user?.providerData[0]?.providerId === 'password' ? 'Cipher Layer: Private' : 'OAuth: Nexus Sync'}
+                         {user?.providerData?.[0]?.providerId === 'password' ? 'Cipher Layer: Private' : 'OAuth: Nexus Sync'}
                       </p>
                    </div>
                    <div className="h-px bg-border/50" />
@@ -385,19 +386,3 @@ export default function Profile() {
     </div>
   );
 }
-
-const ArrowRight = ({ className, strokeWidth }: any) => (
-  <svg 
-    xmlns="http://www.w3.org/2000/svg" 
-    viewBox="0 0 24 24" 
-    fill="none" 
-    stroke="currentColor" 
-    strokeWidth={strokeWidth || "2"} 
-    strokeLinecap="round" 
-    strokeLinejoin="round" 
-    className={className}
-  >
-    <path d="M5 12h14M12 5l7 7-7 7"/>
-  </svg>
-)
-

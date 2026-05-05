@@ -14,12 +14,25 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['*']
 
+USE_X_FORWARDED_HOST = True
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SAMESITE = 'None'
+SESSION_COOKIE_SAMESITE = 'None'
+
+X_FRAME_OPTIONS = 'ALLOWALL'
+
 CSRF_TRUSTED_ORIGINS = [
     'https://*.run.app',
-    'https://*.google.com',
     'https://*.aistudio.google',
+    'https://*.google.com',
+    'https://aistudio.google',
     'http://localhost:3000',
     'http://localhost:5173',
+    'https://ais-dev-oimnturtb4aeaj66tiyypp-463063161662.asia-southeast1.run.app',
+    'https://ais-pre-oimnturtb4aeaj66tiyypp-463063161662.asia-southeast1.run.app',
 ]
 
 INSTALLED_APPS = [
